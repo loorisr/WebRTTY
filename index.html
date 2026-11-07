@@ -1,0 +1,1521 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>WebRTTY</title>
+<meta name="description" content="Modern RTTY modem for HF amateur radio, in your browser.">
+<meta name="theme-color" content="#0b0f14">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#0b0f14; --panel:#121821; --panel2:#18202b; --line:#243041; --text:#e6edf3; --dim:#8b98a9;
+  --accent:#3fb6ff; --mark:#38e1c6; --space:#ffb347; --tx:#ff6b6b; --ok:#3ddc84; --warn:#ffd166;
+  --mono:'JetBrains Mono',ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  --sans:Inter,system-ui,-apple-system,Segoe UI,Roboto,sans-serif;
+}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;background:var(--bg);color:var(--text);font:14px/1.4 var(--sans)}
+button,select,input,textarea{font:inherit;color:inherit}
+.app{display:grid;grid-template-rows:auto auto 1fr auto auto auto;height:100vh;gap:10px;padding:10px}
+header{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.brand{display:flex;align-items:center;gap:10px;font-weight:700;font-size:17px;letter-spacing:.2px}
+.brand .logo{width:28px;height:28px;border-radius:8px;background:linear-gradient(135deg,var(--mark),var(--accent));display:grid;place-items:center;color:#05202a;font:700 12px var(--mono)}
+.chips{display:flex;gap:6px;flex-wrap:wrap;margin-left:4px}
+.chip.opt{}
+@media (max-width:1500px){.chip.opt{display:none}}
+.chip{background:var(--panel);border:1px solid var(--line);border-radius:999px;padding:4px 11px;font:500 12px var(--mono);color:var(--dim);white-space:nowrap}
+.chip b{color:var(--text);font-weight:600}
+.chip.rx{color:var(--ok);border-color:#1f5a3a}
+.chip.txon{color:#fff;background:var(--tx);border-color:var(--tx);animation:pulse 1s infinite}
+@keyframes pulse{50%{opacity:.75}}
+.spacer{flex:1}
+.btn{background:var(--panel2);border:1px solid var(--line);border-radius:9px;padding:7px 11px;cursor:pointer;font-weight:500;transition:.12s;white-space:nowrap}
+.btn:hover{border-color:var(--accent)}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:#04121c;font-weight:600}
+.btn.danger{background:#3a1518;border-color:#6b2328;color:#ffb3b3}
+.btn.on{border-color:var(--mark);color:var(--mark)}
+.btn.sm{padding:4px 9px;font-size:12px;border-radius:7px}
+.btn[hidden]{display:none}
+.top{display:grid;grid-template-columns:1fr 250px;gap:10px;min-height:0}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:14px;overflow:hidden}
+.wfwrap{position:relative;display:flex;flex-direction:column;user-select:none}
+#spec{height:78px;width:100%;display:block;border-bottom:1px solid var(--line);cursor:crosshair}
+#wfbox{flex:1;position:relative;min-height:170px;cursor:crosshair}
+#wf{position:absolute;inset:0;width:100%;height:100%;display:block}
+.wfhint{position:absolute;right:10px;bottom:8px;font:11px var(--mono);color:var(--dim);background:#0b0f14aa;padding:2px 7px;border-radius:6px;pointer-events:none}
+#chans{border-top:1px solid var(--line);max-height:132px;overflow:auto;display:none}
+#chans.show{display:block}
+.chrow{display:grid;grid-template-columns:62px 1fr auto auto;gap:8px;align-items:center;padding:4px 10px;border-bottom:1px solid #1b2431;font:12.5px var(--mono)}
+.chrow:last-child{border-bottom:0}
+.chrow .f{color:var(--mark);font-weight:600}
+.chrow .tx{white-space:nowrap;overflow:hidden;direction:rtl;text-align:left;color:var(--text)}
+.chrow .tx span{direction:ltr;unicode-bidi:bidi-override}
+.chrow .tx .call{color:var(--accent);cursor:pointer}
+.chempty{padding:8px 10px;font-size:12px;color:var(--dim)}
+.side{display:flex;flex-direction:column;gap:10px;padding:12px}
+#scope{width:100%;aspect-ratio:1;border-radius:10px;background:#050a08;display:block}
+.bars{display:grid;grid-template-columns:auto 1fr;gap:4px 8px;align-items:center;font:11px var(--mono);color:var(--dim)}
+.bar{height:7px;background:#0b1118;border-radius:4px;overflow:hidden}
+.bar i{display:block;height:100%;width:0;border-radius:4px;transition:width .08s}
+.qrow{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+.qrow select,.qrow input{width:100%;background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:5px 7px;font-size:12px}
+.toggles{display:flex;flex-wrap:wrap;gap:5px}
+label.mini{font-size:11px;color:var(--dim);display:block;margin-bottom:2px}
+.rxcard{position:relative;min-height:120px;display:flex;flex-direction:column}
+.rxbar{display:flex;align-items:center;gap:6px;padding:7px 10px;border-bottom:1px solid var(--line);font-size:12px;color:var(--dim)}
+#rx{flex:1;overflow:auto;padding:12px 14px;font:15px/1.55 var(--mono);white-space:pre-wrap;word-break:break-word;letter-spacing:.3px}
+#rx .tx{color:var(--tx)}
+.weak{opacity:.42}
+.call{color:var(--accent);cursor:pointer;border-bottom:1px dotted #3fb6ff66}
+.call:hover{background:#3fb6ff22}
+.call.me{color:var(--warn);font-weight:600;border-bottom-color:transparent}
+.call.dupe{color:#7a8699;text-decoration:line-through;border-bottom-color:transparent}
+.macros{display:grid;grid-template-columns:repeat(8,1fr);gap:6px}
+.macros .btn{font-size:12px;padding:7px 4px;overflow:hidden;text-overflow:ellipsis}
+.macros .btn kbd{font:10px var(--mono);color:var(--dim);margin-right:4px}
+.qso{display:grid;grid-template-columns:150px 70px 1fr auto 80px 100px auto;gap:8px;align-items:center}
+.qso input,.txrow textarea{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:9px 11px;font:14px var(--mono);text-transform:uppercase;min-width:0}
+.qso input:focus,.txrow textarea:focus{outline:none;border-color:var(--accent)}
+.badge{font:600 11px var(--mono);padding:4px 8px;border-radius:6px;border:1px solid var(--line);color:var(--dim);text-align:center;min-width:54px}
+.badge.new{color:var(--ok);border-color:#1f5a3a}
+.badge.dupe{color:#fff;background:#8a2a2f;border-color:#8a2a2f}
+.nr{font:12px var(--mono);color:var(--dim);text-align:center}
+.nr b{color:var(--text);font-size:14px}
+.txrow{display:grid;grid-template-columns:1fr auto auto;gap:8px;align-items:stretch}
+.txrow textarea{resize:none;height:42px}
+.modal{position:fixed;inset:0;background:#000a;display:none;align-items:center;justify-content:center;z-index:10;padding:14px}
+.modal.open{display:flex}
+.sheet{background:var(--panel);border:1px solid var(--line);border-radius:16px;width:min(920px,100%);max-height:92vh;overflow:auto;padding:18px 20px}
+.sheet h2{margin:0 0 4px;font-size:18px}
+.sheet h3{margin:18px 0 8px;font-size:13px;text-transform:uppercase;letter-spacing:.8px;color:var(--dim)}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:10px}
+.grid input,.grid select,.mac textarea,.mac input{width:100%;background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:7px 9px}
+.mac{display:grid;grid-template-columns:110px 1fr;gap:6px;margin-bottom:6px}
+.mac textarea{font:12px var(--mono);height:38px;resize:vertical}
+.note{font-size:12px;color:var(--dim)}
+.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+table.log{width:100%;border-collapse:collapse;font:12.5px var(--mono)}
+table.log th{text-align:left;color:var(--dim);font-weight:500;border-bottom:1px solid var(--line);padding:6px 6px}
+table.log td{border-bottom:1px solid #1b2431;padding:5px 6px;white-space:nowrap}
+table.log td.x{cursor:pointer;color:#ff9b9b;text-align:center}
+.toast{position:fixed;left:50%;bottom:22px;transform:translateX(-50%);background:var(--panel2);border:1px solid var(--line);padding:9px 15px;border-radius:10px;opacity:0;transition:.25s;pointer-events:none;z-index:20;max-width:90vw}
+.toast.show{opacity:1}
+.empty{position:absolute;inset:0;display:flex;flex-direction:column;gap:12px;align-items:center;justify-content:center;background:#0b0f14d9;z-index:2;text-align:center;padding:20px}
+.empty p{margin:0;color:var(--dim);max-width:480px}
+@media (max-width:900px){
+  .top{grid-template-columns:1fr}
+  .side{display:grid;grid-template-columns:140px 1fr;align-items:start}
+  .macros{grid-template-columns:repeat(4,1fr)}
+  .qso{grid-template-columns:1fr 70px 1fr;}
+  .app{height:auto;min-height:100vh}
+  #rx{min-height:240px}
+  .rxhelp{display:none}
+}
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <div class="brand"><div class="logo">RY</div>WebRTTY</div>
+    <div class="chips">
+      <span class="chip rx" id="cState">IDLE</span>
+      <span class="chip">CTR <b id="cFreq">1500.0</b> Hz</span>
+      <span class="chip opt">AFC <b id="cAfc">+0.0</b></span>
+      <span class="chip">SNR <b id="cSnr">--</b> dB</span>
+      <span class="chip opt">Q <b id="cQ">--</b></span>
+      <span class="chip" id="cMode">45.45 / 170 LSB</span>
+    </div>
+    <div class="spacer"></div>
+    <button class="btn" id="bInstall" hidden data-i18n="install">Install app</button>
+    <button class="btn primary" id="bStart" data-i18n="start">▶ Start sound card</button>
+    <button class="btn" id="bDemo" data-i18n="demo">Demo</button>
+    <button class="btn" id="bFile" data-i18n="openWav">Open WAV</button>
+    <input type="file" id="fileIn" accept="audio/*" hidden>
+    <button class="btn" id="bScan" data-i18n-title="scanTip" data-i18n="scan">Multi-decode</button>
+    <button class="btn" id="bLog" data-i18n="log">Log</button>
+    <button class="btn" id="bSettings" data-i18n-title="settingsT" aria-label="Settings">⚙</button>
+  </header>
+
+  <div class="top">
+    <div class="card wfwrap">
+      <canvas id="spec"></canvas>
+      <div id="wfbox"><canvas id="wf"></canvas><div class="wfhint" data-i18n="wfHint">click: tune · Shift+click / right-click: notch</div></div>
+      <div id="chans"></div>
+    </div>
+    <div class="card side">
+      <canvas id="scope"></canvas>
+      <div>
+        <div class="bars">
+          <span style="color:var(--mark)">MARK</span><div class="bar"><i id="lvM" style="background:var(--mark)"></i></div>
+          <span style="color:var(--space)">SPACE</span><div class="bar"><i id="lvS" style="background:var(--space)"></i></div>
+          <span>SIG</span><div class="bar"><i id="lvQ" style="background:var(--accent)"></i></div>
+        </div>
+        <div class="qrow" style="margin-top:10px">
+          <div><label class="mini">Baud</label><select id="qBaud"><option>45.45</option><option>50</option><option>75</option><option>100</option></select></div>
+          <div><label class="mini">Shift</label><select id="qShift"><option>170</option><option>200</option><option>425</option><option>450</option><option>850</option></select></div>
+          <div><label class="mini" data-i18n="centerHz">Center Hz</label><input id="qCenter" type="number" step="1" value="1500"></div>
+          <div><label class="mini">Squelch</label><input id="qSql" type="range" min="0" max="0.9" step="0.05" value="0.45"></div>
+        </div>
+        <div class="toggles" style="margin-top:8px">
+          <button class="btn sm" id="tSb">LSB</button>
+          <button class="btn sm" id="tRev">REV</button>
+          <button class="btn sm" id="tAfc">AFC</button>
+          <button class="btn sm" id="tAtc">ATC</button>
+          <button class="btn sm" id="tUsos">USOS</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card rxcard">
+    <div class="rxbar">
+      <span data-i18n="receive">Receive</span><span class="spacer"></span>
+      <span class="note rxhelp" data-i18n="rxHelp">click a call = his call · double-click a word = received exchange</span>
+      <button class="btn sm" id="bCopy" data-i18n="copy">Copy</button>
+      <button class="btn sm" id="bSave" data-i18n="save">Save</button>
+      <button class="btn sm" id="bClear" data-i18n="clear">Clear</button>
+    </div>
+    <div id="rx"></div>
+    <div class="empty" id="empty">
+      <div style="font-size:20px;font-weight:600" data-i18n="readyTitle">Ready to copy RTTY</div>
+      <p data-i18n="readyText">Connect your rig's audio to the computer and press Start sound card, or try the demo: simulated HF signals with noise, fading and three stations.</p>
+      <div style="display:flex;gap:8px"><button class="btn primary" id="bStart2" data-i18n="start">▶ Start sound card</button><button class="btn" id="bDemo2" data-i18n="runDemo">Run demo</button></div>
+    </div>
+  </div>
+
+  <div class="macros" id="macros"></div>
+
+  <div class="qso">
+    <input id="dxCall" data-i18n-ph="hisCall" placeholder="HIS CALL" autocomplete="off">
+    <input id="dxRst" placeholder="RST" value="599" data-i18n-title="rstSent">
+    <input id="rcvd" data-i18n-ph="rcvd" placeholder="RCVD (RST + EXCH)" autocomplete="off">
+    <span class="badge" id="dupe">—</span>
+    <div class="nr"><span data-i18n="nr">NR</span> <b id="nrOut">001</b></div>
+    <input id="dial" data-i18n-ph="dial" placeholder="MHz" inputmode="decimal" data-i18n-title="dialTip">
+    <button class="btn" id="bLogQso" data-i18n="logQso">Log (F9)</button>
+  </div>
+
+  <div class="txrow">
+    <textarea id="txText" data-i18n-ph="txPh" placeholder="Type to transmit… Enter = send, Shift+Enter = new line, Esc = stop"></textarea>
+    <button class="btn primary" id="bSend">TX ▸</button>
+    <button class="btn danger" id="bStop" data-i18n="stop">■ Stop</button>
+  </div>
+</div>
+
+<!-- Settings -->
+<div class="modal" id="modal">
+  <div class="sheet">
+    <div class="row"><h2 data-i18n="settingsT">Settings</h2><span class="spacer"></span><button class="btn" id="bClose" data-i18n="done">Done</button></div>
+    <h3 data-i18n="station">Station</h3>
+    <div class="grid">
+      <div><label class="mini" data-i18n="myCall">My call</label><input id="sCall" style="text-transform:uppercase"></div>
+      <div><label class="mini" data-i18n="myName">My name</label><input id="sName" style="text-transform:uppercase"></div>
+      <div><label class="mini" data-i18n="myQth">My QTH</label><input id="sQth" style="text-transform:uppercase"></div>
+      <div><label class="mini" data-i18n="language">Language</label><select id="sLang"><option value="auto">Auto</option><option value="en">English</option><option value="fr">Français</option></select></div>
+    </div>
+    <h3 data-i18n="contest">Contest &amp; log</h3>
+    <div class="grid">
+      <div><label class="mini" data-i18n="myExch">My exchange {EXCH} (zone, state…)</label><input id="sExch" style="text-transform:uppercase"></div>
+      <div><label class="mini" data-i18n="nextNr">Next serial {NR}</label><input id="sNr" type="number" min="1"></div>
+      <div><label class="mini" data-i18n="macroSet">Macro set</label><div class="row"><button class="btn sm" id="bMacRag" data-i18n="ragchew">Ragchew</button><button class="btn sm" id="bMacCon" data-i18n="contestM">Contest</button></div></div>
+    </div>
+    <h3 data-i18n="audio">Audio</h3>
+    <div class="grid">
+      <div><label class="mini" data-i18n="inDev">Input (from rig)</label><select id="sIn"></select></div>
+      <div><label class="mini" data-i18n="outDev">Output (to rig)</label><select id="sOut"></select></div>
+      <div><label class="mini" data-i18n="inGain">Input gain</label><input id="sGain" type="range" min="0.1" max="4" step="0.1"></div>
+      <div><label class="mini" data-i18n="txLvl">TX audio level</label><input id="sTxLvl" type="range" min="0.02" max="1" step="0.01"></div>
+      <div><label class="mini" data-i18n="monitor">Monitor RX audio</label><select id="sMon"><option value="0" data-i18n="off">Off</option><option value="1" data-i18n="on">On</option></select></div>
+      <div><label class="mini" data-i18n="muteTx">Mute decoder during TX</label><select id="sMute"><option value="1" data-i18n="yes">Yes</option><option value="0" data-i18n="no">No</option></select></div>
+    </div>
+    <p class="note"><span data-i18n="alcNote">Keep the TX level low enough that the ALC does not move — RTTY is 100% duty cycle; many rigs need power reduced to about 50%.</span> <span id="engineInfo"></span></p>
+    <h3 data-i18n="modem">Modem &amp; display</h3>
+    <div class="grid">
+      <div><label class="mini" data-i18n="stopBits">Stop bits (TX)</label><select id="sStop"><option>1.5</option><option>1</option><option>2</option></select></div>
+      <div><label class="mini" data-i18n="afcRange">AFC range ± Hz</label><input id="sAfcR" type="number"></div>
+      <div><label class="mini" data-i18n="maxCh">Multi-decode channels</label><select id="sMaxCh"><option>4</option><option>6</option><option>8</option></select></div>
+      <div><label class="mini" data-i18n="wfRange">Waterfall range</label><select id="sRange"><option value="300-2700">300 – 2700 Hz</option><option value="0-3000">0 – 3000 Hz</option><option value="1000-2600">1000 – 2600 Hz</option><option value="500-1500">500 – 1500 Hz</option></select></div>
+      <div><label class="mini" data-i18n="wfSpeed">Waterfall speed</label><select id="sSpeed"><option value="1" data-i18n="fast">Fast</option><option value="2" data-i18n="normal">Normal</option><option value="3" data-i18n="slow">Slow</option></select></div>
+    </div>
+    <h3>PTT</h3>
+    <div class="grid">
+      <div><label class="mini" data-i18n="pttMethod">PTT method</label><select id="sPtt"><option value="vox">VOX / none</option><option value="rts">Serial RTS</option><option value="dtr">Serial DTR</option></select></div>
+      <div><label class="mini">&nbsp;</label><button class="btn" id="bPort" style="width:100%" data-i18n="choosePort">Choose serial port…</button></div>
+      <div><label class="mini" data-i18n="pttLead">PTT lead (ms)</label><input id="sLead" type="number"></div>
+      <div><label class="mini" data-i18n="txLimit">TX time limit (s)</label><input id="sTot" type="number" min="10"></div>
+    </div>
+    <p class="note" id="portInfo" data-i18n="portNote">Serial PTT uses Web Serial (Chrome / Edge). Both RTS and DTR are released as soon as the port opens.</p>
+    <h3 data-i18n="macrosT">Macros</h3>
+    <p class="note" data-i18n="macroVars">Variables: {MYCALL} {CALL} {RST} {MYNAME} {MYQTH} {EXCH} {NR} {UTC} {DATE} · {LOG} logs the QSO when the macro is sent</p>
+    <div id="macEdit"></div>
+  </div>
+</div>
+
+<!-- Log -->
+<div class="modal" id="logModal">
+  <div class="sheet">
+    <div class="row"><h2 data-i18n="logT">Log</h2><span class="note" id="logCount"></span><span class="spacer"></span>
+      <button class="btn sm" id="bAdif" data-i18n="exportAdif">Export ADIF</button>
+      <button class="btn sm" id="bAdifCopy" data-i18n="copyAdif">Copy ADIF</button>
+      <button class="btn sm danger" id="bLogClear" data-i18n="clearLog">Clear log</button>
+      <button class="btn" id="bLogClose" data-i18n="done">Done</button></div>
+    <div style="overflow:auto;margin-top:10px"><table class="log"><thead><tr>
+      <th>UTC</th><th data-i18n="call">Call</th><th data-i18n="band">Band</th><th>MHz</th><th data-i18n="sent">Sent</th><th data-i18n="rcvdH">Rcvd</th><th></th></tr></thead><tbody id="logBody"></tbody></table></div>
+  </div>
+</div>
+<div class="toast" id="toast"></div>
+
+<script id="core">
+/* WebRTTY core: RTTY demodulator, Baudot codec, AFSK encoder, multi-channel host.
+   No DOM. Runs in a page, an AudioWorklet, or Node.js. */
+(function (root) {
+  'use strict';
+  const LTRS_CH = ['\0','E','\n','A',' ','S','I','U','\r','D','R','J','N','F','C','K','T','Z','L','W','H','Y','P','Q','O','B','G',null,'M','X','V',null];
+  const FIGS_CH = ['\0','3','\n','-',' ','\x07','8','7','\r','$','4',"'",',','!',':','(','5','"',')','2','#','6','0','1','9','?','&',null,'.','/',';',null];
+  const C_FIGS = 0x1B, C_LTRS = 0x1F, C_SPACE = 4;
+  const TWO_PI = 6.283185307179586;
+
+  function butterLP(fc, fs, order) {
+    const out = [];
+    for (let k = 0; k < order / 2; k++) {
+      const Q = 1 / (2 * Math.cos(Math.PI * (2 * k + 1) / (2 * order)));
+      const w0 = 2 * Math.PI * fc / fs, c = Math.cos(w0), al = Math.sin(w0) / (2 * Q);
+      const a0 = 1 + al;
+      out.push({ b0: (1 - c) / 2 / a0, b1: (1 - c) / a0, b2: (1 - c) / 2 / a0, a1: -2 * c / a0, a2: (1 - al) / a0, z1: 0, z2: 0 });
+    }
+    return out;
+  }
+  function runChain(ch, x) {
+    for (let i = 0; i < ch.length; i++) {
+      const f = ch[i];
+      const y = f.b0 * x + f.z1;
+      f.z1 = f.b1 * x - f.a1 * y + f.z2;
+      f.z2 = f.b2 * x - f.a2 * y;
+      x = y;
+    }
+    return x;
+  }
+
+  // Mark = higher RF frequency. On LSB that is the LOWER audio tone.
+  function markSign(sideband, reverse) {
+    const s = sideband === 'USB' ? 1 : -1;
+    return reverse ? -s : s;
+  }
+
+  /* ------------------------------------------------------------------------------------------
+     RttyDecoder
+     - complex front end: mix to baseband at the tuning centre, 4th-order low-pass, decimate
+     - mark/space matched filters (one-bit integration, built from two half-bit sums)
+     - adaptive ATC: blends per-tone signal/noise tracking (selective & multipath fading) with a
+       fast-common-level x slow-balance tracker (flutter), weighted by the measured fading speed;
+       under flutter the half-bit sums are also combined non-coherently
+     - start-bit synchronisation with sub-sample interpolation, AFC, squelch with carrier detect
+     onChar(ch, conf, q): conf = weakest bit's margin relative to the typical margin (≈1 normal,
+     < ~0.3 doubtful), q = mean absolute margin (0..1).
+     ------------------------------------------------------------------------------------------ */
+  class RttyDecoder {
+    constructor(opts) {
+      this.fs = opts.sampleRate;
+      this.onChar = opts.onChar || (() => {});
+      this.cfg = Object.assign({ center: 1500, shift: 170, baud: 45.45, sideband: 'LSB', reverse: false,
+        atc: true, afc: true, squelch: 0, usos: true, afcRange: 100, notches: [] }, opts);
+      delete this.cfg.onChar; delete this.cfg.sampleRate;
+      this.ncoPh = 0;
+      this.scope = new Float32Array(512); this.scopeIdx = 0; this.scopeRot = 0;
+      this.metrics = { mark: 0, space: 0, snr: 0, quality: 0, afcOffset: 0, carrier: false, selective: 1 };
+      this.rebuild();
+    }
+    set(p) {
+      const needs = ['shift', 'baud'].some(k => k in p && p[k] !== this.cfg[k]);
+      Object.assign(this.cfg, p);
+      if ('center' in p) this.userCenter = p.center, this.cfg.center = p.center;
+      if (needs) this.rebuild();
+    }
+    // Forget the signal (levels, sync, shift state) but keep the tuning. Used after our own TX.
+    reset() { const c = this.cfg.center, u = this.userCenter; this.rebuild(); this.cfg.center = c; this.userCenter = u; }
+    rebuild() {
+      const c = this.cfg;
+      this.userCenter = c.center;
+      const target = Math.max(1500, 4 * (c.shift / 2 + 2 * c.baud));
+      this.D = Math.max(1, Math.floor(this.fs / target));
+      this.fsd = this.fs / this.D;
+      const fc = c.shift / 2 + 1.2 * c.baud;
+      this.lpI = butterLP(fc, this.fs, 4); this.lpQ = butterLP(fc, this.fs, 4);
+      this.decCnt = 0;
+      this.bitLen = this.fsd / c.baud;
+      this.L = Math.max(2, Math.round(this.bitLen / 2));   // half-bit integration length
+      this.N = this.L;
+      this.bufMr = new Float32Array(this.N); this.bufMi = new Float32Array(this.N);
+      this.bufSr = new Float32Array(this.N); this.bufSi = new Float32Array(this.N);
+      this.HL = this.L * 2; this.hc = new Float32Array(this.HL * 4); this.hi = 0;
+      this.bi = 0; this.sMr = 0; this.sMi = 0; this.sSr = 0; this.sSi = 0;
+      this.phM = 0; this.phS = 0;
+      this.mSig = 1e-6; this.sSig = 1e-6; this.mNoise = 0; this.sNoise = 0;
+      this.P = 0; this.bm = 1; this.bs = 1; this.imb = 0; this.fade = null;
+      this.prevD = 0; this.state = 0; this.counter = 0; this.bitIdx = 0; this.code = 0; this.qAcc = 0;
+      this.qMin = 0; this.avgAbs = 0; this.figs = false;
+      this.pzm = [0, 0]; this.pzs = [0, 0]; this.afcAcc = 0; this.afcW = 0; this.afcCnt = 0;
+      this.recount = 0; this.t = 0;
+      this.Pc = 0; this.Plong = 0; this.carrierOnT = -1e9; this.carrierOff = true; this.absent = 0; this.seenM = 0; this.seenS = 0;
+      this.metrics.selective = 1;
+      this.acqN = Math.round(0.6 * this.fsd); this.acqR = new Float32Array(this.acqN * 2); this.acqI = 0; this.acqCnt = 0;
+    }
+    process(buf) {
+      const c = this.cfg, fs = this.fs;
+      let inc = TWO_PI * c.center / fs, ph = this.ncoPh;
+      for (let n = 0; n < buf.length; n++) {
+        const x = buf[n];
+        const i = runChain(this.lpI, x * Math.cos(ph));
+        const q = runChain(this.lpQ, -x * Math.sin(ph));
+        ph += inc; if (ph > TWO_PI) ph -= TWO_PI;
+        if (++this.decCnt >= this.D) {
+          this.decCnt = 0;
+          this._dec(i, q);
+          inc = TWO_PI * c.center / fs; // centre may move with AFC
+        }
+      }
+      this.ncoPh = ph;
+    }
+    _dec(bi, bq) {
+      this.t++;
+      // notch filters (absolute audio Hz): z -= e^{jwn} * LP(z * e^{-jwn}), about ±6 Hz wide
+      const nl = this.cfg.notches;
+      if (nl && nl.length) {
+        if (!this.nst || this.nst.length !== nl.length) this.nst = nl.map(() => ({ ph: 0, r: 0, i: 0 }));
+        const a = 1 - Math.exp(-TWO_PI * 6 / this.fsd);
+        for (let k = 0; k < nl.length; k++) {
+          const st = this.nst[k];
+          st.ph += TWO_PI * (nl[k] - this.cfg.center) / this.fsd; if (st.ph > Math.PI) st.ph -= TWO_PI; if (st.ph < -Math.PI) st.ph += TWO_PI;
+          const c = Math.cos(st.ph), s = Math.sin(st.ph);
+          st.r += a * ((bi * c + bq * s) - st.r); st.i += a * ((bq * c - bi * s) - st.i);
+          bi -= st.r * c - st.i * s; bq -= st.r * s + st.i * c;
+        }
+      }
+      if (this.cfg.afc) this._acq(bi, bq);
+      const c = this.cfg, ms = markSign(c.sideband, c.reverse);
+      const fm = ms * c.shift / 2, fsp = -fm;
+      this.phM -= TWO_PI * fm / this.fsd; this.phS -= TWO_PI * fsp / this.fsd;
+      if (this.phM > Math.PI) this.phM -= TWO_PI; if (this.phM < -Math.PI) this.phM += TWO_PI;
+      if (this.phS > Math.PI) this.phS -= TWO_PI; if (this.phS < -Math.PI) this.phS += TWO_PI;
+      const cm = Math.cos(this.phM), sm = Math.sin(this.phM), cs = Math.cos(this.phS), ss = Math.sin(this.phS);
+      const mr = bi * cm - bq * sm, mi = bi * sm + bq * cm;
+      const sr = bi * cs - bq * ss, si = bi * ss + bq * cs;
+      // half-bit running sums
+      const k = this.bi;
+      this.sMr += mr - this.bufMr[k]; this.bufMr[k] = mr;
+      this.sMi += mi - this.bufMi[k]; this.bufMi[k] = mi;
+      this.sSr += sr - this.bufSr[k]; this.bufSr[k] = sr;
+      this.sSi += si - this.bufSi[k]; this.bufSi[k] = si;
+      this.bi = (k + 1) % this.N;
+      if (++this.recount > 20000) { // remove float drift from the running sums
+        this.recount = 0;
+        let a = 0, b = 0, e = 0, f = 0;
+        for (let j = 0; j < this.N; j++) { a += this.bufMr[j]; b += this.bufMi[j]; e += this.bufSr[j]; f += this.bufSi[j]; }
+        this.sMr = a; this.sMi = b; this.sSr = e; this.sSi = f;
+      }
+      const zmr = this.sMr / this.N, zmi = this.sMi / this.N, zsr = this.sSr / this.N, zsi = this.sSi / this.N;
+      // full-bit matched filter = coherent sum of two half-bit sums; non-coherent sum under flutter
+      const C = this.hc, j = this.hi, jl = (j - this.L + this.HL * 2) % this.HL;
+      C[4 * j] = zmr; C[4 * j + 1] = zmi; C[4 * j + 2] = zsr; C[4 * j + 3] = zsi;
+      const mh = Math.hypot(zmr, zmi), sh = Math.hypot(zsr, zsi);
+      const m1 = Math.hypot(zmr + C[4 * jl], zmi + C[4 * jl + 1]) / 2, s1 = Math.hypot(zsr + C[4 * jl + 2], zsi + C[4 * jl + 3]) / 2;
+      const m2 = (mh + Math.hypot(C[4 * jl], C[4 * jl + 1])) / 2, s2 = (sh + Math.hypot(C[4 * jl + 2], C[4 * jl + 3])) / 2;
+      this.hi = (j + 1) % this.HL;
+      const w0 = this.metrics.selective;
+      const m = w0 * m1 + (1 - w0) * m2, s = w0 * s1 + (1 - w0) * s2;
+
+      // per-tone signal / noise levels
+      const aS = 1 / this.bitLen, aN = 1 / (this.bitLen * 4);
+      if (m > s) { this.mSig += aS * (m - this.mSig); this.sNoise += aN * (s - this.sNoise); }
+      else { this.sSig += aS * (s - this.sSig); this.mNoise += aN * (m - this.mNoise); }
+      const pk = m > s ? m : s;
+      // single-tone mode: a notch sits on one tone, so decode on-off keying of the other tone,
+      // with that tone's level tracked against its own threshold
+      const mNotched = this._notchNear(markSign(c.sideband, c.reverse) * c.shift / 2), sNotched = this._notchNear(-markSign(c.sideband, c.reverse) * c.shift / 2);
+      const single = mNotched !== sNotched ? (mNotched ? 'space' : 'mark') : null;
+      let dSingle = 0;
+      if (single) {
+        const x = single === 'mark' ? m : s, T = this.t2 || (this.t2 = { S: x, N: 0, low: 0 });
+        const aD = 1 / (this.bitLen * 8); // a keyed tone can be off for a whole character (e.g. LTRS + stop)
+        if (x > 0.5 * (T.S + T.N)) { T.S += aS * (x - T.S); T.low = 0; } else { T.N += aN * (x - T.N); if (++T.low > 15 * this.bitLen) T.S += aD * (x - T.S); }
+        const v = Math.min(x, T.S) - 0.5 * (T.S + T.N);
+        dSingle = 2 * (single === 'mark' ? v : -v); // same scale as the two-tone decision
+      } else this.t2 = null;
+      let d;
+      if (c.atc) {
+        // strategy 2: fast common level x slow per-tone balance (flutter)
+        const aF = 1 / (this.bitLen * 0.7), aB = 1 / (this.bitLen * 3);
+        if (this.P === 0) this.P = pk;
+        this.P += aF * (pk - this.P);
+        const P = this.P + 1e-12;
+        if (m > s) this.bm += aB * (Math.min(2, m / P) - this.bm); else this.bs += aB * (Math.min(2, s / P) - this.bs);
+        const lm = P * this.bm, ls = P * this.bs;
+        const d2 = (Math.min(m, lm) - 0.5 * (lm + this.mNoise)) - (Math.min(s, ls) - 0.5 * (ls + this.sNoise));
+        // strategy 1: per-tone clipped mid-threshold (selective / multipath fading)
+        const d1 = (Math.min(m, this.mSig) - 0.5 * (this.mSig + this.mNoise)) - (Math.min(s, this.sSig) - 0.5 * (this.sSig + this.sNoise));
+        // fading speed of the active tone, normalised by that tone's long-term level
+        if (!this.fade) this.fade = { f: [pk, pk], s: [pk, pk], l: [pk, pk] };
+        const F = this.fade, ti = m > s ? 0 : 1;
+        F.f[ti] += (1 / (this.bitLen * 0.25)) * (pk - F.f[ti]);
+        F.s[ti] += (1 / (this.bitLen * 4)) * (pk - F.s[ti]);
+        if (F.s[ti] > 4 * F.l[ti]) F.l[ti] = F.s[ti]; else F.l[ti] += (1 / (this.bitLen * 60)) * (pk - F.l[ti]);
+        const fl = Math.min(0.6, Math.abs(F.f[ti] - F.s[ti]) / (F.l[ti] + 1e-12));
+        this.imb += (1 / (this.bitLen * 80)) * (fl - this.imb);
+        const w = Math.min(1, Math.max(0, (0.30 - this.imb) * 33));
+        this.metrics.selective = w;
+        d = w * d1 + (1 - w) * d2;
+      } else d = (m - s) * 0.5;
+      if (single) d = dSingle;
+      const norm = single ? this.t2.S + 1e-12 : 0.5 * (this.mSig + this.sSig) + 1e-12;
+
+      // AFC: phase rotation of the dominant half-bit filter = residual frequency error
+      if (c.afc) {
+        let zr, zi, pr, pi, wt;
+        if (m > s) { zr = zmr; zi = zmi; pr = this.pzm[0]; pi = this.pzm[1]; wt = m * m; }
+        else { zr = zsr; zi = zsi; pr = this.pzs[0]; pi = this.pzs[1]; wt = s * s; }
+        const dp = Math.atan2(zi * pr - zr * pi, zr * pr + zi * pi);
+        if (Math.abs(d) / norm > 0.5) { this.afcAcc += wt * dp; this.afcW += wt; }
+        if (++this.afcCnt >= this.N) {
+          this.afcCnt = 0;
+          if (this.afcW > 0 && this.metrics.snr > 7 && this.metrics.quality > 0.5) {
+            const err = (this.afcAcc / this.afcW) * this.fsd / TWO_PI;
+            const lo = this.userCenter - c.afcRange, hi = this.userCenter + c.afcRange;
+            c.center = Math.min(hi, Math.max(lo, c.center + 0.15 * err));
+          }
+          this.afcAcc = 0; this.afcW = 0;
+        }
+      }
+      this.pzm[0] = zmr; this.pzm[1] = zmi; this.pzs[0] = zsr; this.pzs[1] = zsi;
+
+      // tuning scope: re-rotated baseband outputs so tones draw as lines (mark ⟷, space ↕)
+      this.scopeRot += 0.73;
+      const cr = Math.cos(this.scopeRot), sr2 = Math.sin(this.scopeRot);
+      this.scope[this.scopeIdx] = (zmr * cr - zmi * sr2) / (norm * 1.4);
+      this.scope[this.scopeIdx + 1] = (zsr * cr - zsi * sr2) / (norm * 1.4);
+      this.scopeIdx = (this.scopeIdx + 2) % this.scope.length;
+
+      const M = this.metrics;
+      M.mark = m; M.space = s;
+      const nz = 0.5 * (this.mNoise + this.sNoise) + 1e-12;
+      M.snr = single ? 20 * Math.log10(this.t2.S / (this.t2.N + 1e-12)) : 20 * Math.log10(norm / nz);
+      M.afcOffset = c.center - this.userCenter;
+
+      // carrier detect (used only by the squelch): fast level vs long-term level, plus SNR
+      this.Pc += (1 / (this.bitLen * 0.5)) * (pk - this.Pc);
+      this.Plong += (1 / (this.bitLen * (this.Pc > this.Plong ? 3 : 40))) * (this.Pc - this.Plong);
+      // hysteresis: "off" only after a full second without signal, so fades do not count
+      const present = this.t > 0.5 * this.fsd && this.Pc > 0.3 * this.Plong && M.snr > 6; // 0.5 s warm-up: noise estimate starts at 0
+      if (present) { if (this.carrierOff) { this.carrierOnT = this.t; this.seenM = 0; this.seenS = 0; } this.carrierOff = false; this.absent = 0; }
+      else if (++this.absent > this.fsd) this.carrierOff = true;
+      M.carrier = !this.carrierOff;
+      if (m > s) this.seenM++; else this.seenS++; // both tones must be learned before printing
+
+      this._sync(d, norm);
+    }
+    _notchNear(off) { // is a notch within 25 Hz of the tone at baseband offset `off`?
+      const nl = this.cfg.notches; if (!nl || !nl.length) return false;
+      const f = this.cfg.center + off; return nl.some(n => Math.abs(n - f) < 25);
+    }
+    // AFC acquisition: when decoding is poor, search ±afcRange for the best mark/space pair
+    // (non-coherent, one-bit segments over the last 0.6 s) and jump there if clearly better.
+    _acq(bi, bq) {
+      const R = this.acqR, N = this.acqN;
+      R[2 * this.acqI] = bi; R[2 * this.acqI + 1] = bq; this.acqI = (this.acqI + 1) % N;
+      if (++this.acqCnt < N / 2 || this.t < N) return;
+      this.acqCnt = 0;
+      if (this.metrics.quality > 0.55) return;
+      const c = this.cfg, ms = markSign(c.sideband, c.reverse), fm = ms * c.shift / 2, seg = Math.max(4, Math.round(this.bitLen));
+      // per-segment energy of one tone at baseband frequency f over the last 0.6 s
+      const segE = f => {
+        const w = -TWO_PI * f / this.fsd, cw = Math.cos(w), sw = Math.sin(w), out = [];
+        let pr = 1, pi = 0, ar = 0, ai = 0, k = 0;
+        for (let n = 0; n < N; n++) {
+          const j = (this.acqI + n) % N, xr = R[2 * j], xi = R[2 * j + 1];
+          ar += xr * pr - xi * pi; ai += xr * pi + xi * pr;
+          const t2 = pr * cw - pi * sw; pi = pr * sw + pi * cw; pr = t2;
+          if (++k === seg) { out.push(ar * ar + ai * ai); ar = 0; ai = 0; k = 0; }
+        }
+        return out;
+      };
+      const sum = a => a.reduce((x, y) => x + y, 0);
+      const E = [], offs = [];
+      for (let df = -c.afcRange; df <= c.afcRange; df += 4) {
+        const nc = c.center + df; if (nc < this.userCenter - c.afcRange || nc > this.userCenter + c.afcRange) continue;
+        E.push(Math.min(sum(segE(fm + df)), sum(segE(-fm + df)))); offs.push(df); // both tones must be there
+      }
+      if (E.length < 5) return;
+      let best = 0; for (let i = 1; i < E.length; i++) if (E[i] > E[best]) best = i;
+      const sorted = E.slice().sort((x, y) => x - y), med = sorted[sorted.length >> 1];
+      const i0 = offs.indexOf(0), e0 = i0 >= 0 ? E[i0] : med, df = offs[best];
+      if (Math.abs(df) < 8 || !(E[best] > 4 * med) || !(E[best] > 2 * e0)) { this.acqPend = null; return; }
+      // FSK signature: mark and space take turns (negatively correlated); a carrier does not
+      const a1 = segE(fm + df), a2 = segE(-fm + df), n = Math.min(a1.length, a2.length);
+      const m1 = sum(a1) / n, m2 = sum(a2) / n; let sxy = 0, sxx = 0, syy = 0;
+      for (let i = 0; i < n; i++) { const x = a1[i] - m1, y = a2[i] - m2; sxy += x * y; sxx += x * x; syy += y * y; }
+      if (sxy / Math.sqrt(sxx * syy + 1e-30) > -0.2) { this.acqPend = null; return; }
+      // the same target must be found by two searches in a row before we jump
+      const target = c.center + df;
+      if (this.acqPend == null || Math.abs(this.acqPend - target) > 8) { this.acqPend = target; return; }
+      this.acqPend = null; c.center = target; this.metrics.acq = (this.metrics.acq || 0) + 1;
+    }
+    _sync(d, norm) {
+      const pd = this.prevD;
+      this.prevD = d;
+      if (this.state === 0) {
+        if (pd > 0 && d <= 0) {
+          const frac = pd / (pd - d);
+          this.counter = 0.5 * this.bitLen - (1 - frac);
+          this.state = 1; this.bitIdx = 0; this.code = 0; this.qAcc = 0;
+          this.tStart = this.t - (1 - frac);
+        }
+        return;
+      }
+      this.counter -= 1;
+      if (this.counter > 0) return;
+      const t = -this.counter; // sample at the bit centre, interpolated
+      const v = d + (pd - d) * t;
+      this.qAcc += Math.min(1, Math.abs(v) / norm);
+      const av = Math.abs(v);
+      this.avgAbs = this.avgAbs ? this.avgAbs + 0.01 * (av - this.avgAbs) : av;
+      const rel = av / (this.avgAbs + 1e-12);
+      if (this.bitIdx === 0 || rel < this.qMin) this.qMin = rel;
+      if (this.bitIdx === 0) {
+        if (v > 0) { this.state = 0; return; } // glitch, not a start bit
+      } else if (this.bitIdx <= 5) {
+        if (v > 0) this.code |= 1 << (this.bitIdx - 1);
+      } else {
+        const q = this.qAcc / 7;
+        this.metrics.quality = 0.8 * this.metrics.quality + 0.2 * q;
+        this.state = 0;
+        if (v <= 0) return; // framing error: stop bit missing
+        const sq = this.cfg.squelch;
+        if (sq > 0) {
+          if (q < sq || this.metrics.snr < sq * 15) return;
+          if (this.carrierOff) return;                                // no signal for a while
+          if (this.tStart - this.carrierOnT < 1.5 * this.bitLen) return; // first character after onset is unreliable
+          if (this.seenS < 4 * this.bitLen || this.seenM < 4 * this.bitLen) return;  // ATC has not heard both tones yet
+        }
+        this._emit(this.code, this.qMin, q);
+        return;
+      }
+      this.bitIdx++;
+      this.counter += this.bitLen;
+    }
+    _emit(code, conf, q) {
+      if (code === C_FIGS) { this.figs = true; return; }
+      if (code === C_LTRS) { this.figs = false; return; }
+      const ch = (this.figs ? FIGS_CH : LTRS_CH)[code];
+      if (code === C_SPACE && this.cfg.usos) this.figs = false;
+      if (ch === '\0' || ch == null || ch === '\x07' || ch === '\r') return;
+      this.onChar(ch, conf, q);
+    }
+  }
+
+  /* Text -> Baudot. After every space the shift state is treated as unknown, so the next
+     character always carries its own LTRS/FIGS: correct for receivers with USOS on or off. */
+  function textToCodeList(text) {
+    const L = {}, F = {};
+    LTRS_CH.forEach((c, i) => { if (c && c !== '\0') L[c] = i; });
+    FIGS_CH.forEach((c, i) => { if (c && c !== '\0' && !(c in L)) F[c] = i; });
+    const out = [];
+    let figs = null; // null = unknown
+    for (const ch of String(text).toUpperCase()) {
+      if (ch === '\r') continue;
+      if (ch === '\n') { out.push({ codes: [8, 2], ch: '\n' }); continue; }
+      if (ch === ' ') { out.push({ codes: [C_SPACE], ch: ' ' }); figs = null; continue; }
+      if (ch in L) { out.push({ codes: figs === false ? [L[ch]] : [C_LTRS, L[ch]], ch }); figs = false; }
+      else if (ch in F) { out.push({ codes: figs === true ? [F[ch]] : [C_FIGS, F[ch]], ch }); figs = true; }
+    }
+    return out;
+  }
+  function textToCodes(text) {
+    const codes = [C_LTRS, C_LTRS];
+    for (const e of textToCodeList(text)) codes.push(...e.codes);
+    return codes;
+  }
+
+  // Phase-continuous AFSK with smoothed frequency transitions (clean, narrow signal)
+  function renderAfsk(codes, o) {
+    const fs = o.sampleRate, baud = o.baud || 45.45, shift = o.shift || 170, center = o.center || 1500;
+    const ms = markSign(o.sideband || 'LSB', !!o.reverse);
+    const fMark = center + ms * shift / 2, fSpace = center - ms * shift / 2;
+    const T = fs / baud;
+    const leadIn = Math.round((o.leadMs == null ? 150 : o.leadMs) * fs / 1000);
+    const bits = [];
+    for (const c of codes) {
+      bits.push([0, 1]);
+      for (let b = 0; b < 5; b++) bits.push([(c >> b) & 1, 1]);
+      bits.push([1, o.stopBits || 1.5]);
+    }
+    let total = leadIn * 2;
+    for (const b of bits) total += b[1] * T;
+    total = Math.ceil(total) + leadIn;
+    const keyed = new Float32Array(total);
+    let n = 0; for (; n < leadIn; n++) keyed[n] = 1;
+    let acc = leadIn;
+    for (const [v, dur] of bits) { const end = acc + dur * T; for (; n < end && n < total; n++) keyed[n] = v; acc = end; }
+    for (; n < total; n++) keyed[n] = 1;
+    const W = Math.max(1, Math.round(T / 5));
+    const sm = new Float32Array(total); let run = W;
+    for (let i = 0; i < total; i++) { run += keyed[i] - (i >= W ? keyed[i - W] : 1); sm[i] = run / W; }
+    const out = new Float32Array(total);
+    const amp = o.amplitude == null ? 0.5 : o.amplitude;
+    const ramp = Math.round(0.005 * fs);
+    let ph = 0;
+    for (let i = 0; i < total; i++) {
+      const f = fSpace + (fMark - fSpace) * sm[i];
+      ph += TWO_PI * f / fs; if (ph > TWO_PI) ph -= TWO_PI;
+      let g = amp;
+      if (i < ramp) g *= i / ramp; else if (i > total - ramp) g *= (total - i) / ramp;
+      out[i] = g * Math.sin(ph);
+    }
+    out.fMark = fMark; out.fSpace = fSpace; out.keyed = sm; out.leadIn = leadIn; out.charSamples = (6 + (o.stopBits || 1.5)) * T;
+    return out;
+  }
+
+  /* RttyHost: a set of decoders on one audio stream, driven by messages. The same code runs in
+     an AudioWorklet (off the main thread) or, as a fallback, on the main thread.
+       in : {type:'add'|'set', id, cfg} {type:'remove', id} {type:'reset', id?} {type:'mute', on}
+       out: {type:'chars', items:[[id, ch, conf], ...]}
+            {type:'metrics', list:[{id, center, userCenter, m, s, sig, snr, q, afc, sel, car}], scope, scopeIdx} */
+  class RttyHost {
+    constructor(sampleRate, post) {
+      this.fs = sampleRate; this.post = post; this.dec = new Map(); this.muted = false;
+      this.items = []; this.acc = 0; this.every = Math.round(sampleRate * 0.05);
+    }
+    handle(m) {
+      if (m.type === 'add') {
+        const d = new RttyDecoder(Object.assign({}, m.cfg, { sampleRate: this.fs, onChar: (ch, conf) => this.items.push([m.id, ch, conf]) }));
+        this.dec.set(m.id, d);
+      } else if (m.type === 'set') { const d = this.dec.get(m.id); if (d) d.set(m.cfg); }
+      else if (m.type === 'remove') this.dec.delete(m.id);
+      else if (m.type === 'reset') { for (const [id, d] of this.dec) if (m.id == null || m.id === id) d.reset(); }
+      else if (m.type === 'mute') this.muted = !!m.on;
+    }
+    process(buf) {
+      if (!this.muted) for (const d of this.dec.values()) d.process(buf);
+      this.acc += buf.length;
+      if (this.acc < this.every) return;
+      this.acc = 0;
+      if (this.items.length) { this.post({ type: 'chars', items: this.items }); this.items = []; }
+      const list = []; let scope = null, scopeIdx = 0;
+      for (const [id, d] of this.dec) {
+        const M = d.metrics;
+        list.push({ id, center: d.cfg.center, userCenter: d.userCenter, m: M.mark, s: M.space, sig: Math.max(d.mSig, d.sSig),
+          snr: M.snr, q: M.quality, afc: M.afcOffset, sel: M.selective, car: M.carrier });
+        if (id === 'main') { scope = d.scope.slice(); scopeIdx = d.scopeIdx; }
+      }
+      this.post({ type: 'metrics', list, scope, scopeIdx });
+    }
+  }
+
+  const api = { RttyDecoder, RttyHost, textToCodeList, textToCodes, renderAfsk, markSign, LTRS_CH, FIGS_CH };
+  if (typeof module !== 'undefined' && module.exports) module.exports = api; else root.RTTY = api;
+})(typeof globalThis !== 'undefined' ? globalThis : this);
+
+</script>
+<script>
+(() => {
+'use strict';
+const $ = id => document.getElementById(id);
+
+/* ================= i18n ================= */
+const STR = {
+  en: {
+    install: 'Install app', start: '▶ Start sound card', stopCard: '■ Stop sound card', demo: 'Demo', openWav: 'Open WAV', scan: 'Multi-decode',
+    scanTip: 'Decode every RTTY signal on the waterfall at once', log: 'Log', settings: '⚙ Settings', wfHint: 'click: tune · Shift+click / right-click: notch',
+    centerHz: 'Center Hz', receive: 'Receive', rxHelp: 'click a call = his call · double-click a word = received exchange',
+    copy: 'Copy', save: 'Save', clear: 'Clear', readyTitle: 'Ready to copy RTTY',
+    readyText: "Connect your rig's audio to the computer and press Start sound card, or try the demo: simulated HF signals with noise, fading and three stations.",
+    runDemo: 'Run demo', hisCall: 'HIS CALL', rstSent: 'RST sent', rcvd: 'RCVD (RST + EXCH)', nr: 'NR', dial: 'MHz',
+    dialTip: 'Dial frequency in MHz (for the log)', logQso: 'Log (F9)', txPh: 'Type to transmit… Enter = send, Shift+Enter = new line, Esc = stop',
+    stop: '■ Stop', settingsT: 'Settings', done: 'Done', station: 'Station', myCall: 'My call', myName: 'My name', myQth: 'My QTH',
+    language: 'Language', contest: 'Contest & log', myExch: 'My exchange {EXCH} (zone, state…)', nextNr: 'Next serial {NR}',
+    macroSet: 'Macro set', ragchew: 'Ragchew', contestM: 'Contest', audio: 'Audio', inDev: 'Input (from rig)', outDev: 'Output (to rig)',
+    inGain: 'Input gain', txLvl: 'TX audio level', monitor: 'Monitor RX audio', muteTx: 'Mute decoder during TX', off: 'Off', on: 'On', yes: 'Yes', no: 'No',
+    alcNote: 'Keep the TX level low enough that the ALC does not move — RTTY is 100% duty cycle; many rigs need power reduced to about 50%.',
+    modem: 'Modem & display', stopBits: 'Stop bits (TX)', afcRange: 'AFC range ± Hz', maxCh: 'Multi-decode channels', wfRange: 'Waterfall range',
+    wfSpeed: 'Waterfall speed', fast: 'Fast', normal: 'Normal', slow: 'Slow', pttMethod: 'PTT method', choosePort: 'Choose serial port…',
+    pttLead: 'PTT lead (ms)', txLimit: 'TX time limit (s)', portNote: 'Serial PTT uses Web Serial (Chrome / Edge). Both RTS and DTR are released as soon as the port opens.',
+    macrosT: 'Macros', macroVars: 'Variables: {MYCALL} {CALL} {RST} {MYNAME} {MYQTH} {EXCH} {NR} {UTC} {DATE} · {LOG} logs the QSO when the macro is sent',
+    logT: 'Log', exportAdif: 'Export ADIF', copyAdif: 'Copy ADIF', clearLog: 'Clear log', confirmClear: 'Click again to confirm', call: 'Call', band: 'Band', sent: 'Sent', rcvdH: 'Rcvd',
+    idle: 'IDLE', new: 'NEW', dupeB: 'DUPE', qsos: n => `${n} QSO${n === 1 ? '' : 's'}`,
+    tDemo: 'Demo: 3 simulated stations with noise & fading. Click the others on the waterfall (~915 & ~2125 Hz), or turn on Multi-decode.',
+    tNoMic: 'Sound card access was refused: ', tNoMic2: '. Allow the microphone for this page (Chrome / Edge).', tBadFile: 'Could not read that audio file.',
+    tPlaying: 'Playing ', tCopied: 'Copied', tCopyBlocked: 'Copy blocked by the browser', tHisCall: 'His call → ', tRcvd: 'Received → ',
+    tLogged: c => `Logged ${c}`, tNoCall: 'Enter his call first', tDupe: c => `${c} is a dupe on this band`, tPttErr: 'PTT error: ',
+    tNoSerial: 'Web Serial is not available in this browser — use Chrome or Edge, or VOX.', tPortOk: 'PTT port connected', tPortGone: 'PTT port disconnected',
+    tPortErr: 'Port error: ', tTot: 'TX time limit reached — transmission stopped', tOutDev: 'Output device: ', tMacros: 'Macros loaded',
+    tCleared: 'Log cleared', engineW: 'Audio engine: AudioWorklet (off the main thread).', engineS: 'Audio engine: ScriptProcessor (fallback).',
+    portConnected: m => `Serial port connected · PTT via ${m}.`, noChans: 'Scanning for RTTY signals…', tuneHere: 'Tune', remove: 'Remove',
+    weakTip: 'Grey characters = low confidence', tNotchOn: f => `Notch at ${f} Hz — Shift+click or right-click it again to remove`, tNotchOff: f => `Notch at ${f} Hz removed`,
+  },
+  fr: {
+    install: "Installer l'app", start: '▶ Démarrer la carte son', stopCard: '■ Arrêter la carte son', demo: 'Démo', openWav: 'Ouvrir WAV', scan: 'Multi-décodage',
+    scanTip: 'Décoder tous les signaux RTTY du waterfall en même temps', log: 'Log', settings: '⚙ Réglages', wfHint: 'clic : caler · Maj+clic / clic droit : notch',
+    centerHz: 'Centre Hz', receive: 'Réception', rxHelp: 'clic sur un indicatif = son indicatif · double-clic sur un mot = échange reçu',
+    copy: 'Copier', save: 'Enregistrer', clear: 'Effacer', readyTitle: 'Prêt à décoder le RTTY',
+    readyText: "Reliez l'audio du transceiver à l'ordinateur et cliquez sur Démarrer la carte son, ou essayez la démo : signaux HF simulés avec bruit, fading et trois stations.",
+    runDemo: 'Lancer la démo', hisCall: 'SON INDICATIF', rstSent: 'RST envoyé', rcvd: 'REÇU (RST + ÉCHANGE)', nr: 'NR', dial: 'MHz',
+    dialTip: 'Fréquence affichée en MHz (pour le log)', logQso: 'Logger (F9)', txPh: 'Tapez pour émettre… Entrée = envoyer, Maj+Entrée = nouvelle ligne, Échap = stop',
+    stop: '■ Stop', settingsT: 'Réglages', done: 'OK', station: 'Station', myCall: 'Mon indicatif', myName: 'Mon prénom', myQth: 'Mon QTH',
+    language: 'Langue', contest: 'Contest & log', myExch: 'Mon échange {EXCH} (zone, dépt…)', nextNr: 'Prochain numéro {NR}',
+    macroSet: 'Jeu de macros', ragchew: 'QSO classique', contestM: 'Contest', audio: 'Audio', inDev: 'Entrée (depuis le TRX)', outDev: 'Sortie (vers le TRX)',
+    inGain: "Gain d'entrée", txLvl: 'Niveau audio TX', monitor: "Écoute de l'audio RX", muteTx: 'Couper le décodeur en TX', off: 'Non', on: 'Oui', yes: 'Oui', no: 'Non',
+    alcNote: "Gardez le niveau TX assez bas pour que l'ALC ne bouge pas — le RTTY émet à 100 % ; beaucoup de TRX demandent de réduire la puissance vers 50 %.",
+    modem: 'Modem & affichage', stopBits: 'Bits de stop (TX)', afcRange: 'Plage AFC ± Hz', maxCh: 'Canaux du multi-décodage', wfRange: 'Plage du waterfall',
+    wfSpeed: 'Vitesse du waterfall', fast: 'Rapide', normal: 'Normale', slow: 'Lente', pttMethod: 'Méthode PTT', choosePort: 'Choisir le port série…',
+    pttLead: 'Avance PTT (ms)', txLimit: "Durée max d'émission (s)", portNote: "Le PTT série utilise Web Serial (Chrome / Edge). RTS et DTR sont relâchés dès l'ouverture du port.",
+    macrosT: 'Macros', macroVars: "Variables : {MYCALL} {CALL} {RST} {MYNAME} {MYQTH} {EXCH} {NR} {UTC} {DATE} · {LOG} logge le QSO à l'envoi de la macro",
+    logT: 'Log', exportAdif: 'Exporter ADIF', copyAdif: 'Copier ADIF', clearLog: 'Vider le log', confirmClear: 'Cliquez encore pour confirmer', call: 'Indicatif', band: 'Bande', sent: 'Envoyé', rcvdH: 'Reçu',
+    idle: 'ARRÊT', new: 'NOUVEAU', dupeB: 'DOUBLON', qsos: n => `${n} QSO`,
+    tDemo: 'Démo : 3 stations simulées avec bruit et fading. Cliquez les autres sur le waterfall (~915 et ~2125 Hz), ou activez le Multi-décodage.',
+    tNoMic: 'Accès à la carte son refusé : ', tNoMic2: '. Autorisez le micro pour cette page (Chrome / Edge).', tBadFile: 'Impossible de lire ce fichier audio.',
+    tPlaying: 'Lecture de ', tCopied: 'Copié', tCopyBlocked: 'Copie bloquée par le navigateur', tHisCall: 'Son indicatif → ', tRcvd: 'Reçu → ',
+    tLogged: c => `${c} loggé`, tNoCall: "Saisissez d'abord son indicatif", tDupe: c => `${c} est un doublon sur cette bande`, tPttErr: 'Erreur PTT : ',
+    tNoSerial: "Web Serial n'est pas disponible dans ce navigateur — utilisez Chrome ou Edge, ou le VOX.", tPortOk: 'Port PTT connecté', tPortGone: 'Port PTT déconnecté',
+    tPortErr: 'Erreur de port : ', tTot: "Durée max d'émission atteinte — émission arrêtée", tOutDev: 'Périphérique de sortie : ', tMacros: 'Macros chargées',
+    tCleared: 'Log vidé', engineW: 'Moteur audio : AudioWorklet (hors du fil principal).', engineS: 'Moteur audio : ScriptProcessor (secours).',
+    portConnected: m => `Port série connecté · PTT par ${m}.`, noChans: 'Recherche de signaux RTTY…', tuneHere: 'Caler', remove: 'Retirer',
+    weakTip: 'Caractères gris = faible confiance', tNotchOn: f => `Notch à ${f} Hz — Maj+clic ou clic droit dessus pour le retirer`, tNotchOff: f => `Notch à ${f} Hz retiré`,
+  },
+};
+let LANG = 'en';
+const t = (k, ...a) => { const v = (STR[LANG] && STR[LANG][k]) ?? STR.en[k] ?? k; return typeof v === 'function' ? v(...a) : v; };
+function applyI18n() {
+  LANG = S.lang === 'auto' ? ((navigator.language || 'en').toLowerCase().startsWith('fr') ? 'fr' : 'en') : S.lang;
+  document.documentElement.lang = LANG;
+  document.querySelectorAll('[data-i18n]').forEach(e => { e.textContent = t(e.dataset.i18n); });
+  document.querySelectorAll('[data-i18n-ph]').forEach(e => { e.placeholder = t(e.dataset.i18nPh); });
+  document.querySelectorAll('[data-i18n-title]').forEach(e => { e.title = t(e.dataset.i18nTitle); });
+  $('rx').title = t('weakTip');
+  setRunning(running); updateDupe(); renderChans();
+}
+
+/* ================= settings, macros, log storage ================= */
+const MACROS_RAG = [
+  ['CQ', 'CQ CQ CQ DE {MYCALL} {MYCALL} {MYCALL}\nCQ CQ CQ DE {MYCALL} {MYCALL} {MYCALL} PSE K\n'],
+  ['Answer', '{CALL} {CALL} DE {MYCALL} {MYCALL} {MYCALL} KN\n'],
+  ['Exchange', '{CALL} DE {MYCALL} GA TNX FER CALL. UR RST {RST} {RST}. NAME {MYNAME} {MYNAME}. QTH {MYQTH} {MYQTH}. HW? {CALL} DE {MYCALL} KN\n'],
+  ['73', '{CALL} TNX FER NICE QSO. 73 ES GL. {CALL} DE {MYCALL} SK\n{LOG}'],
+  ['Brag', 'RIG HR IS ... ANT IS ... SW IS WEBRTTY\n'],
+  ['TU QRZ', 'TU {MYCALL} QRZ\n'],
+  ['QRZ?', 'QRZ? QRZ? DE {MYCALL} K\n'],
+  ['AGN', 'AGN AGN PSE\n'],
+];
+const MACROS_CON = [
+  ['CQ', 'CQ TEST {MYCALL} {MYCALL} TEST\n'],
+  ['Exch', '{CALL} {RST} {EXCH} {EXCH} {CALL}\n'],
+  ['TU', 'TU {MYCALL} TEST\n{LOG}'],
+  ['My call', '{MYCALL} {MYCALL}\n'],
+  ['S&P exch', '{CALL} TU {RST} {EXCH} {EXCH}\n{LOG}'],
+  ['NR?', 'NR? NR?\n'],
+  ['Call?', 'CALL? CALL?\n'],
+  ['AGN', 'AGN AGN\n'],
+];
+const S = Object.assign({
+  call: 'N0CALL', name: 'OP', qth: 'HOME', lang: 'auto', baud: 45.45, shift: 170, sideband: 'LSB', reverse: false,
+  atc: true, afc: true, usos: true, squelch: 0.45, center: 1500, gain: 1, txLvl: 0.4, mon: 0, mute: 1,
+  stopBits: 1.5, afcRange: 100, range: '300-2700', speed: 1, ptt: 'vox', lead: 80, tot: 180, inId: '', outId: '',
+  exch: '', nr: 1, dial: '14.085', scan: false, maxCh: 6, macros: MACROS_RAG,
+}, load('webrtty'));
+let LOG = load('webrtty-log', []);
+function load(k, d = {}) { try { return JSON.parse(localStorage.getItem(k)) ?? d; } catch (e) { return d; } }
+function save() { try { localStorage.setItem('webrtty', JSON.stringify(S)); } catch (e) {} }
+function saveLog() { try { localStorage.setItem('webrtty-log', JSON.stringify(LOG)); } catch (e) {} }
+
+/* ================= audio engine ================= */
+let ctx = null, analyser = null, inGain = null, monGain = null, outGain = null, src = null, stream = null;
+let hostPost = null, engine = '';
+let running = false, txActive = false, txNode = null, txQueue = [], serialPort = null, frame = 0, totTimer = null;
+let fftData = null, avgSpec = null;
+const NOTCH = []; // notch filters, audio Hz (not saved between sessions)
+const MET = {}; let scopeBuf = new Float32Array(512), scopeIdx = 0;
+const toast = (m, ms = 2600) => { const e = $('toast'); e.textContent = m; e.classList.add('show'); clearTimeout(e._h); e._h = setTimeout(() => e.classList.remove('show'), ms); };
+
+const PROC = `
+class RttyHostProcessor extends AudioWorkletProcessor {
+  constructor() { super(); this.host = new globalThis.RTTY.RttyHost(sampleRate, m => this.port.postMessage(m));
+    this.port.onmessage = e => this.host.handle(e.data); }
+  process(inputs) { const x = inputs[0] && inputs[0][0]; if (x) this.host.process(x); return true; }
+}
+registerProcessor('rtty-host', RttyHostProcessor);`;
+
+let ctxPromise = null;
+function ensureCtx() { return ctxPromise || (ctxPromise = buildCtx()); }
+async function buildCtx() {
+  ctx = new (window.AudioContext || window.webkitAudioContext)({ latencyHint: 'interactive' });
+  analyser = ctx.createAnalyser(); analyser.fftSize = 8192; analyser.smoothingTimeConstant = 0.15;
+  analyser.minDecibels = -140; analyser.maxDecibels = 0;
+  fftData = new Float32Array(analyser.frequencyBinCount); avgSpec = new Float32Array(analyser.frequencyBinCount);
+  inGain = ctx.createGain(); inGain.gain.value = S.gain;
+  monGain = ctx.createGain(); monGain.gain.value = +S.mon;
+  outGain = ctx.createGain();
+  const sink = ctx.createGain(); sink.gain.value = 0; sink.connect(ctx.destination);
+  inGain.connect(analyser); inGain.connect(monGain); monGain.connect(ctx.destination); outGain.connect(ctx.destination);
+  try {
+    if (!ctx.audioWorklet) throw new Error('no worklet');
+    const url = URL.createObjectURL(new Blob([$('core').textContent + PROC], { type: 'application/javascript' }));
+    await ctx.audioWorklet.addModule(url);
+    const node = new AudioWorkletNode(ctx, 'rtty-host', { numberOfInputs: 1, numberOfOutputs: 1, outputChannelCount: [1] });
+    node.port.onmessage = e => onHost(e.data);
+    hostPost = m => node.port.postMessage(m);
+    inGain.connect(node); node.connect(sink); engine = 'worklet';
+  } catch (e) {
+    const host = new RTTY.RttyHost(ctx.sampleRate, onHost);
+    const proc = ctx.createScriptProcessor(2048, 1, 1);
+    proc.onaudioprocess = ev => host.process(ev.inputBuffer.getChannelData(0));
+    inGain.connect(proc); proc.connect(sink);
+    hostPost = m => host.handle(m); engine = 'script';
+  }
+  $('engineInfo').textContent = t(engine === 'worklet' ? 'engineW' : 'engineS');
+  hostPost({ type: 'add', id: 'main', cfg: modemCfg() });
+  for (const c of CH) hostPost({ type: 'add', id: c.id, cfg: chanCfg(c.f) });
+  if (S.outId && ctx.setSinkId) ctx.setSinkId(S.outId).catch(() => {});
+}
+function modemCfg() {
+  return { center: +S.center, shift: +S.shift, baud: +S.baud, sideband: S.sideband, reverse: S.reverse, atc: S.atc,
+    afc: S.afc, usos: S.usos, squelch: +S.squelch, afcRange: +S.afcRange, notches: NOTCH.slice() };
+}
+function chanCfg(f) { return Object.assign(modemCfg(), { center: f, afc: true, afcRange: 40, squelch: Math.max(0.45, +S.squelch) }); }
+function applyModem() {
+  if (hostPost) { hostPost({ type: 'set', id: 'main', cfg: modemCfg() });
+    for (const c of CH) { const m = MET[c.id]; hostPost({ type: 'set', id: c.id, cfg: Object.assign(chanCfg(c.f), { center: m ? m.center : c.f }) }); } }
+  syncUi(); save();
+}
+function onHost(msg) {
+  if (msg.type === 'chars') {
+    for (const [id, ch, conf] of msg.items) {
+      if (id === 'main') pendingRx.push([ch, conf]);
+      else { const c = CH.find(x => x.id === id); if (c) { c.text = (c.text + (ch === '\n' ? ' ' : ch)).slice(-160); c.last = performance.now(); c.dirty = true; } }
+    }
+  } else if (msg.type === 'metrics') {
+    for (const m of msg.list) MET[m.id] = m;
+    if (msg.scope) { scopeBuf = msg.scope; scopeIdx = msg.scopeIdx; }
+  }
+}
+function stopSource() {
+  if (src) { try { src.stop && src.stop(); } catch (e) {} try { src.disconnect(); } catch (e) {} src = null; }
+  if (stream) { stream.getTracks().forEach(x => x.stop()); stream = null; }
+}
+async function startMic() {
+  await ensureCtx(); await ctx.resume(); stopSource();
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({ audio: { deviceId: S.inId ? { exact: S.inId } : undefined,
+      echoCancellation: false, noiseSuppression: false, autoGainControl: false, channelCount: 1 } });
+  } catch (e) { toast(t('tNoMic') + (e.message || e.name) + t('tNoMic2'), 6000); return; }
+  src = ctx.createMediaStreamSource(stream); src.connect(inGain);
+  setRunning('LIVE'); listDevices();
+}
+async function startDemo() {
+  await ensureCtx(); await ctx.resume(); stopSource();
+  const buf = makeDemo(ctx.sampleRate);
+  const b = ctx.createBuffer(1, buf.length, ctx.sampleRate); b.copyToChannel(buf, 0);
+  src = ctx.createBufferSource(); src.buffer = b; src.loop = true; src.connect(inGain); src.start();
+  S.center = 1500; $('qCenter').value = 1500; applyModem(); hostPost({ type: 'reset' });
+  setRunning('DEMO'); toast(t('tDemo'), 6000);
+}
+async function startFile(file) {
+  await ensureCtx(); await ctx.resume();
+  let audio;
+  try { audio = await ctx.decodeAudioData(await file.arrayBuffer()); } catch (e) { toast(t('tBadFile')); return; }
+  stopSource();
+  src = ctx.createBufferSource(); src.buffer = audio; src.connect(inGain); src.start();
+  src.onended = () => { if (running === 'FILE') setRunning(false); };
+  setRunning('FILE'); toast(t('tPlaying') + file.name);
+}
+function setRunning(kind) {
+  running = kind; $('empty').style.display = kind ? 'none' : '';
+  $('bStart').textContent = kind === 'LIVE' ? t('stopCard') : t('start');
+  $('bDemo').classList.toggle('on', kind === 'DEMO');
+  if (!txActive) $('cState').textContent = kind ? 'RX · ' + kind : t('idle');
+}
+
+/* demo signal: 3 stations, AWGN, selective fading */
+function makeDemo(fs) {
+  const secs = 75, n = Math.floor(fs * secs), out = new Float32Array(n);
+  let seed = 7; const rnd = () => (seed = (seed * 1103515245 + 12345) & 0x7fffffff) / 0x7fffffff;
+  const gauss = () => Math.sqrt(-2 * Math.log(rnd() || 1e-9)) * Math.cos(6.283185 * rnd());
+  const st = [
+    { f: 1500, a: 0.10, t0: 0.5, fade: 0.15, txt: 'CQ CQ CQ DE F4XYZ F4XYZ F4XYZ\nCQ CQ CQ DE F4XYZ F4XYZ F4XYZ PSE K\n\nG3ABC DE F4XYZ GA OM TNX FER CALL. UR RST 599 599. NAME PIERRE PIERRE. QTH PARIS PARIS. RIG IC-7300 ES DIPOLE. HW? G3ABC DE F4XYZ KN\n' },
+    { f: 2125, a: 0.045, t0: 3, fade: 0.9, txt: 'DL1ABC DE G3XYZ G3XYZ R R TNX FER RPRT. UR RST 579 579 IN SURREY. WX HR CLOUDY ES 12C. 73 ES GUD DX. DL1ABC DE G3XYZ SK\n' },
+    { f: 915, a: 0.03, t0: 6, fade: 0.5, txt: 'CQ TEST EA5ZZ EA5ZZ TEST\nDL2AA 599 14 14 DL2AA\nTU EA5ZZ TEST\nCQ TEST EA5ZZ EA5ZZ TEST\nOK1AB 599 15 15 OK1AB\nTU EA5ZZ TEST\n' },
+  ];
+  for (const s of st) {
+    const sig = RTTY.renderAfsk(RTTY.textToCodes(s.txt), { sampleRate: fs, center: s.f, shift: 170, baud: 45.45, amplitude: s.a });
+    const off = Math.floor(s.t0 * fs), pm = rnd() * 6, ps = rnd() * 6;
+    for (let i = 0; i < sig.length && i + off < n; i++) {
+      const tt = i / fs, k = sig.keyed[i];
+      const gm = 1 - s.fade * (0.5 + 0.5 * Math.sin(6.283 * 0.21 * tt + pm)) ** 3;
+      const gs = 1 - s.fade * (0.5 + 0.5 * Math.sin(6.283 * 0.13 * tt + ps)) ** 3;
+      out[i + off] += sig[i] * (gm * k + gs * (1 - k));
+    }
+  }
+  for (let i = 0; i < n; i++) out[i] += 0.035 * gauss();
+  return out;
+}
+
+/* ================= receive text ================= */
+const rxEl = $('rx');
+const CALL_RE = /^(?:[A-Z0-9]{1,4}\/)?(?:[A-Z]{1,2}\d|\d[A-Z]|[A-Z]\d[A-Z])\d{0,1}[A-Z]{1,4}(?:\/[A-Z0-9]{1,4})?$/;
+const WEAK = 0.2;
+let pendingRx = [], word = null, autoScroll = true, txSpan = null;
+rxEl.addEventListener('scroll', () => { autoScroll = rxEl.scrollTop + rxEl.clientHeight > rxEl.scrollHeight - 30; });
+function endWord() {
+  if (!word) return;
+  const w = word.textContent;
+  if (CALL_RE.test(w)) { word.classList.add('call'); styleCall(word); }
+  word = null;
+}
+function styleCall(el) {
+  const c = el.textContent;
+  el.classList.toggle('me', c === S.call.toUpperCase());
+  el.classList.toggle('dupe', c !== S.call.toUpperCase() && isDupe(c));
+}
+function rxAppend(items) { // [[ch, conf], ...]
+  txSpan = null;
+  for (const [ch, conf] of items) {
+    if (ch === ' ' || ch === '\n') { endWord(); rxEl.appendChild(document.createTextNode(ch)); continue; }
+    if (!word) { word = document.createElement('span'); word.className = 'w'; rxEl.appendChild(word); }
+    if (conf < WEAK) { const s = document.createElement('span'); s.className = 'weak'; s.textContent = ch; word.appendChild(s); }
+    else if (word.lastChild && word.lastChild.nodeType === 3) word.lastChild.data += ch;
+    else word.appendChild(document.createTextNode(ch));
+  }
+  trimRx();
+}
+function txEcho(text) {
+  endWord();
+  if (!txSpan) { txSpan = document.createElement('span'); txSpan.className = 'tx'; rxEl.appendChild(txSpan); }
+  txSpan.textContent += text; trimRx();
+}
+function trimRx() {
+  if (rxEl.childNodes.length > 9000) while (rxEl.childNodes.length > 7000) rxEl.removeChild(rxEl.firstChild);
+  if (autoScroll) rxEl.scrollTop = rxEl.scrollHeight;
+}
+function restyleCalls() { rxEl.querySelectorAll('.call').forEach(styleCall); renderChans(true); }
+// text that follows an element, up to the end of its line
+function textAfter(el, max = 70) {
+  let s = '', n = el;
+  while (s.length < max) {
+    while (n && !n.nextSibling) n = n.parentNode === rxEl ? null : n.parentNode;
+    if (!n) break; n = n.nextSibling;
+    const tx = n.textContent; const k = tx.indexOf('\n');
+    if (k >= 0) { s += tx.slice(0, k); break; } s += tx;
+  }
+  return s;
+}
+function parseExch(after) {
+  const m = after.match(/\b([1-5][1-9N][9N])\s+((?:[0-9A-Z\/]+\s*){1,2})/);
+  if (!m) return '';
+  const rst = m[1].replace(/N/g, '9');
+  const parts = m[2].trim().split(/\s+/);
+  const ex = parts[0] && !/^(TU|DE|K|KN|BK|QRZ|TEST)$/.test(parts[0]) && !CALL_RE.test(parts[0]) ? parts[0] : '';
+  return (rst + ' ' + ex).trim();
+}
+function pickCall(c, after) {
+  $('dxCall').value = c; updateDupe();
+  const ex = after != null ? parseExch(after) : '';
+  if (ex) $('rcvd').value = ex;
+  toast(t('tHisCall') + c + (ex ? '  ·  ' + t('tRcvd') + ex : ''), 1800);
+}
+rxEl.addEventListener('click', e => {
+  const el = e.target.closest('.call'); if (!el) return;
+  pickCall(el.textContent, textAfter(el));
+});
+rxEl.addEventListener('dblclick', e => {
+  const el = e.target.closest('.w'); if (!el || el.classList.contains('call')) return;
+  const w = el.textContent.trim(); if (!w) return;
+  const r = $('rcvd'); r.value = (r.value ? r.value + ' ' : '') + w; window.getSelection()?.removeAllRanges();
+  toast(t('tRcvd') + r.value, 1400);
+});
+
+/* ================= multi-decode channels ================= */
+let CH = [], chSeq = 0, scanAt = 0; const BLOCK = [];
+function chanById(id) { return CH.find(c => c.id === id); }
+function addChan(f) {
+  const id = 'c' + (++chSeq), c = { id, f, text: '', last: performance.now(), seen: performance.now(), dirty: true };
+  CH.push(c); CH.sort((a, b) => a.f - b.f);
+  if (hostPost) hostPost({ type: 'add', id, cfg: chanCfg(f) });
+}
+function removeChan(id, block) {
+  const c = chanById(id); if (!c) return;
+  CH = CH.filter(x => x.id !== id); if (hostPost) hostPost({ type: 'remove', id });
+  if (block) BLOCK.push({ f: (MET[id] || c).center || c.f, until: performance.now() + 60000 });
+  delete MET[id]; renderChans(true);
+}
+function scanSignals(now) {
+  if (!S.scan || !running || !avgSpec || now - scanAt < 1500) return;
+  scanAt = now;
+  const [a, b] = range(), sh = +S.shift, bw = ctx.sampleRate / analyser.fftSize;
+  const P = f => { const i = f / bw, i0 = Math.floor(i), tt = i - i0; return (avgSpec[i0] || 0) * (1 - tt) + (avgSpec[i0 + 1] || 0) * tt; };
+  const sorted = Array.from(avgSpec.subarray(Math.floor(a / bw), Math.floor(b / bw))).sort((x, y) => x - y);
+  const floor = sorted[Math.floor(sorted.length * 0.3)] || 1e-12;
+  const cand = [];
+  for (let c = a + sh / 2 + 10; c <= b - sh / 2 - 10; c += 2) {
+    const pm = P(c - sh / 2), ps = P(c + sh / 2), mid = P(c), lo = Math.min(pm, ps);
+    if (lo > floor * 6 && mid < 0.7 * lo && Math.max(pm, ps) < 12 * lo) cand.push({ c, s: lo });
+  }
+  cand.sort((x, y) => y.s - x.s);
+  const picks = [];
+  for (const k of cand) if (!picks.some(p => Math.abs(p.c - k.c) < sh * 0.9)) picks.push(k);
+  for (let i = BLOCK.length - 1; i >= 0; i--) if (BLOCK[i].until < now) BLOCK.splice(i, 1);
+  const mainF = MET.main ? MET.main.center : +S.center;
+  for (const p of picks) {
+    if (Math.abs(p.c - mainF) < 60 || BLOCK.some(x => Math.abs(x.f - p.c) < 60)) continue;
+    const ex = CH.find(c => Math.abs(((MET[c.id] || {}).center || c.f) - p.c) < 60);
+    if (ex) ex.seen = now; else if (CH.length < +S.maxCh) addChan(p.c);
+  }
+  for (const c of [...CH]) if (now - c.seen > 25000 && now - c.last > 25000) removeChan(c.id);
+  renderChans();
+}
+function renderChans(force) {
+  const box = $('chans'); box.classList.toggle('show', !!S.scan);
+  $('bScan').classList.toggle('on', !!S.scan);
+  if (!S.scan) return;
+  if (!CH.length) { box.innerHTML = `<div class="chempty">${t('noChans')}</div>`; return; }
+  const ids = CH.map(c => c.id).join();
+  if (force || box.dataset.ids !== ids) {
+    box.dataset.ids = ids; box.innerHTML = '';
+    for (const c of CH) {
+      const r = document.createElement('div'); r.className = 'chrow'; r.dataset.id = c.id;
+      r.innerHTML = `<span class="f"></span><span class="tx"><span></span></span><button class="btn sm" data-a="tune">${t('tuneHere')}</button><button class="btn sm" data-a="rm" title="${t('remove')}">✕</button>`;
+      box.appendChild(r); c.dirty = true;
+    }
+  }
+  for (const c of CH) {
+    const r = box.querySelector(`[data-id="${c.id}"]`); if (!r) continue;
+    const m = MET[c.id]; r.querySelector('.f').textContent = ((m ? m.center : c.f)).toFixed(0);
+    if (c.dirty) {
+      c.dirty = false;
+      const span = r.querySelector('.tx span'); span.innerHTML = '';
+      for (const tok of c.text.split(/(\s+)/)) {
+        if (CALL_RE.test(tok)) { const e = document.createElement('span'); e.className = 'call'; e.textContent = tok; styleCall(e); span.appendChild(e); }
+        else span.appendChild(document.createTextNode(tok));
+      }
+    }
+  }
+}
+$('chans').addEventListener('click', e => {
+  const row = e.target.closest('.chrow'); if (!row) return;
+  const id = row.dataset.id, c = chanById(id); if (!c) return;
+  const a = e.target.dataset.a;
+  if (e.target.classList.contains('call')) { pickCall(e.target.textContent, c.text.slice(c.text.lastIndexOf(e.target.textContent) + e.target.textContent.length)); return; }
+  if (a === 'rm') removeChan(id, true);
+  else if (a === 'tune') {
+    const f = (MET[id] || c).center || c.f;
+    if (c.text) rxAppend([['\n', 1], ...[...c.text.trim()].map(ch => [ch, 1]), ['\n', 1]]);
+    removeChan(id, false);
+    S.center = Math.round(f * 10) / 10; $('qCenter').value = S.center.toFixed(0); applyModem(); hostPost({ type: 'reset', id: 'main' });
+  }
+});
+$('bScan').onclick = () => {
+  S.scan = !S.scan; save();
+  if (!S.scan) for (const c of [...CH]) removeChan(c.id);
+  scanAt = 0; renderChans(true);
+};
+
+/* ================= log, dupes, ADIF ================= */
+const BANDS = [[1.8, 2, '160m'], [3.5, 4, '80m'], [5.25, 5.45, '60m'], [7, 7.3, '40m'], [10.1, 10.15, '30m'], [14, 14.35, '20m'],
+  [18.068, 18.168, '17m'], [21, 21.45, '15m'], [24.89, 24.99, '12m'], [28, 29.7, '10m'], [50, 54, '6m'], [144, 148, '2m']];
+const bandOf = mhz => { const f = parseFloat(String(mhz).replace(',', '.')); const b = BANDS.find(x => f >= x[0] && f <= x[1]); return b ? b[2] : ''; };
+const curBand = () => bandOf(S.dial);
+const isDupe = c => !!c && LOG.some(q => q.call === c && q.band === curBand());
+const pad3 = n => String(n).padStart(3, '0');
+function updateDupe() {
+  const c = $('dxCall').value.trim().toUpperCase(), b = $('dupe');
+  b.className = 'badge' + (c ? (isDupe(c) ? ' dupe' : ' new') : '');
+  b.textContent = c ? (isDupe(c) ? t('dupeB') : t('new')) : '—';
+  $('nrOut').textContent = pad3(S.nr);
+}
+function logQso() {
+  const call = $('dxCall').value.trim().toUpperCase();
+  if (!call) { toast(t('tNoCall')); return false; }
+  if (isDupe(call)) toast(t('tDupe', call), 2200);
+  const now = new Date();
+  const usesNr = S.macros.some(m => /\{NR\}/.test(m[1]));
+  const sent = (($('dxRst').value || '599') + ' ' + (usesNr ? pad3(S.nr) : (S.exch || ''))).trim();
+  LOG.push({ call, time: now.toISOString(), mhz: S.dial, band: curBand(), rstS: $('dxRst').value || '599', sent: sent.trim(), rcvd: $('rcvd').value.trim().toUpperCase(), nr: S.nr });
+  saveLog(); S.nr++; save();
+  $('dxCall').value = ''; $('rcvd').value = ''; updateDupe(); restyleCalls(); renderLog();
+  toast(t('tLogged', call), 1600); return true;
+}
+function adifField(k, v) { v = String(v ?? ''); return v ? `<${k}:${new TextEncoder().encode(v).length}>${v} ` : ''; }
+function toAdif() {
+  let s = `WebRTTY log export\n<ADIF_VER:5>3.1.4 <PROGRAMID:7>WebRTTY <CREATED_TIMESTAMP:15>${new Date().toISOString().replace(/[-:]/g, '').slice(0, 8)} ${new Date().toISOString().replace(/[-:]/g, '').slice(9, 15)} <EOH>\n`;
+  for (const q of LOG) {
+    const d = q.time.replace(/[-:]/g, '');
+    const r = q.rcvd.split(/\s+/), rstR = /^[1-5][1-9][1-9]$/.test(r[0] || '') ? r.shift() : '';
+    const srx = r.join(' ');
+    s += adifField('CALL', q.call) + adifField('QSO_DATE', d.slice(0, 8)) + adifField('TIME_ON', d.slice(9, 15)) +
+      adifField('BAND', q.band) + adifField('FREQ', q.mhz) + adifField('MODE', 'RTTY') + adifField('RST_SENT', q.rstS) +
+      adifField('RST_RCVD', rstR) + adifField('STX', q.nr) + adifField('STX_STRING', q.sent.replace(/^\S+\s*/, '')) +
+      (/^\d+$/.test(srx) ? adifField('SRX', +srx) : '') + adifField('SRX_STRING', srx) + adifField('STATION_CALLSIGN', S.call) + '<EOR>\n';
+  }
+  return s;
+}
+function renderLog() {
+  $('logCount').textContent = t('qsos', LOG.length);
+  const tb = $('logBody'); tb.innerHTML = '';
+  LOG.slice().reverse().forEach((q, ri) => {
+    const i = LOG.length - 1 - ri, tr = document.createElement('tr');
+    const cells = [q.time.slice(5, 10).replace('-', '/') + ' ' + q.time.slice(11, 16), q.call, q.band, q.mhz, q.sent, q.rcvd];
+    for (const c of cells) { const td = document.createElement('td'); td.textContent = c; tr.appendChild(td); }
+    const x = document.createElement('td'); x.className = 'x'; x.textContent = '✕';
+    x.onclick = () => { LOG.splice(i, 1); saveLog(); renderLog(); updateDupe(); restyleCalls(); };
+    tr.appendChild(x); tb.appendChild(tr);
+  });
+}
+$('bLog').onclick = () => { renderLog(); $('logModal').classList.add('open'); };
+$('bLogClose').onclick = () => $('logModal').classList.remove('open');
+$('logModal').onclick = e => { if (e.target.id === 'logModal') $('logModal').classList.remove('open'); };
+$('bAdif').onclick = () => download('webrtty-' + new Date().toISOString().slice(0, 10) + '.adi', toAdif(), 'text/plain');
+$('bAdifCopy').onclick = () => navigator.clipboard.writeText(toAdif()).then(() => toast(t('tCopied')), () => toast(t('tCopyBlocked')));
+$('bLogClear').onclick = e => {
+  const b = e.currentTarget;
+  if (!b.dataset.arm) { b.dataset.arm = '1'; b.textContent = t('confirmClear'); setTimeout(() => { delete b.dataset.arm; b.textContent = t('clearLog'); }, 3000); return; }
+  delete b.dataset.arm; b.textContent = t('clearLog'); LOG = []; saveLog(); renderLog(); updateDupe(); restyleCalls(); toast(t('tCleared'));
+};
+$('bLogQso').onclick = logQso;
+$('dxCall').addEventListener('input', updateDupe);
+$('dial').addEventListener('change', e => { S.dial = e.target.value.replace(',', '.'); save(); updateDupe(); restyleCalls(); });
+function download(name, text, type) {
+  const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([text], { type })); a.download = name;
+  document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
+}
+
+/* ================= transmit ================= */
+function expand(txt) {
+  const now = new Date();
+  return txt.replace(/\{MYCALL\}/g, S.call).replace(/\{CALL\}/g, $('dxCall').value.trim() || '???')
+    .replace(/\{RST\}/g, $('dxRst').value || '599').replace(/\{MYNAME\}/g, S.name).replace(/\{MYQTH\}/g, S.qth)
+    .replace(/\{EXCH\}/g, S.exch || '').replace(/\{NR\}/g, pad3(S.nr))
+    .replace(/\{UTC\}/g, now.toISOString().slice(11, 16).replace(':', '') + 'Z')
+    .replace(/\{DATE\}/g, now.toISOString().slice(0, 10)).toUpperCase();
+}
+function sendMacro(i) {
+  const m = S.macros[i]; if (!m) return;
+  const wantsLog = /\{LOG\}/i.test(m[1]);
+  const text = expand(m[1].replace(/\{LOG\}/gi, ''));
+  queueTx(text);
+  if (wantsLog) logQso();
+}
+function queueTx(text) { if (!text.trim()) return; txQueue.push(text); if (!txActive) nextTx(); }
+async function nextTx() {
+  const text = txQueue.shift(); if (text == null) return;
+  await ensureCtx(); await ctx.resume();
+  const fs = ctx.sampleRate, baud = +S.baud;
+  const codes = [31, 31], marks = [];
+  for (const e of RTTY.textToCodeList(text)) { codes.push(...e.codes); marks.push([codes.length - 1, e.ch]); }
+  codes.push(31);
+  const center = MET.main ? MET.main.center : +S.center;
+  const buf = RTTY.renderAfsk(codes, { sampleRate: fs, center, shift: +S.shift, baud, sideband: S.sideband,
+    reverse: S.reverse, amplitude: +S.txLvl, stopBits: +S.stopBits, leadMs: 150 });
+  const b = ctx.createBuffer(1, buf.length, fs); b.copyToChannel(buf, 0);
+  txActive = true; setTxUi(true);
+  if (+S.mute) hostPost({ type: 'mute', on: true });
+  if (!(await ptt(true))) { endTx(); return; }
+  await new Promise(r => setTimeout(r, +S.lead));
+  if (!txActive) { await ptt(false); return; }
+  txNode = ctx.createBufferSource(); txNode.buffer = b; txNode.connect(outGain);
+  const t0 = ctx.currentTime + 0.02; txNode.start(t0);
+  clearTimeout(totTimer); totTimer = setTimeout(() => { toast(t('tTot'), 4000); stopTx(); }, Math.max(10, +S.tot) * 1000);
+  rxAppend(pendingRx); pendingRx = [];
+  if (rxEl.lastChild && !/\n$/.test(rxEl.lastChild.textContent)) txEcho('\n');
+  const lead = 0.15, cd = buf.charSamples / fs;
+  const echo = marks.map(([i, ch]) => [t0 + lead + (i + 1) * cd, ch]);
+  const timer = setInterval(() => { while (echo.length && echo[0][0] <= ctx.currentTime) txEcho(echo.shift()[1]); }, 40);
+  txNode.onended = async () => {
+    clearInterval(timer);
+    while (echo.length) txEcho(echo.shift()[1]);
+    if (!/\n$/.test(txSpan ? txSpan.textContent : '')) txEcho('\n');
+    txNode = null; await ptt(false); endTx();
+    if (txQueue.length) nextTx();
+  };
+}
+function endTx() {
+  clearTimeout(totTimer); txActive = false; setTxUi(false); txSpan = null;
+  if (hostPost) { hostPost({ type: 'mute', on: false }); hostPost({ type: 'reset' }); } // fresh decoder state after our own TX
+}
+function stopTx() {
+  txQueue = [];
+  if (txNode) { try { txNode.stop(); } catch (e) {} }
+  else if (txActive) { ptt(false); endTx(); }
+}
+function setTxUi(on) {
+  const c = $('cState'); c.classList.toggle('txon', on); c.classList.toggle('rx', !on);
+  c.textContent = on ? 'TX' : (running ? 'RX · ' + running : t('idle'));
+}
+/* PTT over Web Serial: both lines are always driven explicitly */
+async function ptt(on) {
+  if (S.ptt === 'vox' || !serialPort) return true;
+  try {
+    await serialPort.setSignals(S.ptt === 'rts' ? { requestToSend: on, dataTerminalReady: false } : { dataTerminalReady: on, requestToSend: false });
+    return true;
+  } catch (e) { toast(t('tPttErr') + e.message, 4000); if (on) { try { await serialPort.setSignals({ requestToSend: false, dataTerminalReady: false }); } catch (x) {} } return false; }
+}
+async function choosePort() {
+  if (!('serial' in navigator)) { toast(t('tNoSerial'), 5000); return; }
+  try {
+    const p = await navigator.serial.requestPort();
+    await p.open({ baudRate: 9600 });
+    await p.setSignals({ requestToSend: false, dataTerminalReady: false }); // release both lines immediately
+    serialPort = p;
+    if (S.ptt === 'vox') { S.ptt = 'rts'; $('sPtt').value = 'rts'; save(); }
+    $('portInfo').textContent = t('portConnected', S.ptt.toUpperCase()); toast(t('tPortOk'));
+  } catch (e) { if (e.name !== 'NotFoundError') toast(t('tPortErr') + e.message); }
+}
+if ('serial' in navigator) navigator.serial.addEventListener('disconnect', e => {
+  if (serialPort && e.target === serialPort) { serialPort = null; if (txActive) stopTx(); toast(t('tPortGone'), 4000); $('portInfo').textContent = t('portNote'); }
+});
+window.addEventListener('pagehide', () => {
+  if (serialPort) { try { serialPort.setSignals({ requestToSend: false, dataTerminalReady: false }); } catch (e) {} }
+});
+
+/* ================= display ================= */
+const spec = $('spec'), wf = $('wf'), scope = $('scope');
+const sctx = spec.getContext('2d'), wctx = wf.getContext('2d'), kctx = scope.getContext('2d');
+const LUT = (() => {
+  const st = [[0, [4, 8, 20]], [0.22, [8, 40, 100]], [0.45, [0, 110, 180]], [0.62, [0, 190, 215]], [0.78, [255, 214, 10]], [0.92, [255, 120, 40]], [1, [255, 255, 255]]];
+  const l = new Uint8ClampedArray(256 * 3);
+  for (let i = 0; i < 256; i++) {
+    const v = i / 255; let k = 0; while (k < st.length - 2 && v > st[k + 1][0]) k++;
+    const [a, ca] = st[k], [b, cb] = st[k + 1], tt = (v - a) / (b - a);
+    for (let j = 0; j < 3; j++) l[i * 3 + j] = ca[j] + (cb[j] - ca[j]) * tt;
+  }
+  return l;
+})();
+let dpr = 1, row = null, floorDb = -100, hoverF = null;
+function range() { return S.range.split('-').map(Number); }
+function resize() {
+  dpr = Math.min(2, window.devicePixelRatio || 1);
+  for (const c of [spec, wf]) { c.width = Math.max(1, Math.round(c.clientWidth * dpr)); c.height = Math.max(1, Math.round(c.clientHeight * dpr)); }
+  scope.width = Math.max(1, Math.round(scope.clientWidth * dpr)); scope.height = scope.width;
+  row = wctx.createImageData(wf.width, 1);
+  wctx.fillStyle = '#04081a'; wctx.fillRect(0, 0, wf.width, wf.height);
+}
+window.addEventListener('resize', resize);
+const f2x = (f, w) => { const [a, b] = range(); return (f - a) / (b - a) * w; };
+const x2f = (x, w) => { const [a, b] = range(); return a + x / w * (b - a); };
+function binPow(f) { const bw = ctx.sampleRate / analyser.fftSize, i = f / bw, i0 = Math.floor(i), tt = i - i0; const a = fftData[i0] ?? -140, b = fftData[i0 + 1] ?? -140; return Math.pow(10, (a + (b - a) * tt) / 10); }
+
+function draw(now) {
+  requestAnimationFrame(draw);
+  frame++;
+  if (pendingRx.length) { rxAppend(pendingRx); pendingRx = []; }
+  if (!ctx || !running) { if (frame % 30 === 0) { sctx.fillStyle = '#0d131b'; sctx.fillRect(0, 0, spec.width, spec.height); drawScale(); drawMarkers(); } return; }
+  analyser.getFloatFrequencyData(fftData);
+  for (let i = 0; i < fftData.length; i++) avgSpec[i] += 0.08 * (Math.pow(10, fftData[i] / 10) - avgSpec[i]);
+  const W = wf.width, H = wf.height, bw = ctx.sampleRate / analyser.fftSize;
+  const px = new Float32Array(W);
+  for (let x = 0; x < W; x++) {
+    const b0 = Math.floor(x2f(x, W) / bw), b1 = Math.max(b0 + 1, Math.floor(x2f(x + 1, W) / bw));
+    let m = -200; for (let b = b0; b < b1; b++) if (fftData[b] > m) m = fftData[b];
+    px[x] = m;
+  }
+  const sorted = Array.from(px).sort((a, b) => a - b), fl = sorted[Math.floor(W * 0.25)];
+  if (isFinite(fl)) floorDb += 0.05 * (fl - floorDb);
+  if (frame % +S.speed === 0) {
+    wctx.drawImage(wf, 0, 0, W, H - 1, 0, 1, W, H - 1);
+    const d = row.data;
+    for (let x = 0; x < W; x++) {
+      let v = (px[x] - floorDb + 6) / 42; v = v < 0 ? 0 : v > 1 ? 1 : v;
+      const k = (v * 255) | 0; d[x * 4] = LUT[k * 3]; d[x * 4 + 1] = LUT[k * 3 + 1]; d[x * 4 + 2] = LUT[k * 3 + 2]; d[x * 4 + 3] = 255;
+    }
+    wctx.putImageData(row, 0, 0);
+  }
+  drawSpec(px); drawScope();
+  scanSignals(now);
+  const M = MET.main;
+  if (M && frame % 6 === 0) {
+    $('cFreq').textContent = M.center.toFixed(1);
+    $('cAfc').textContent = (M.afc >= 0 ? '+' : '') + M.afc.toFixed(1);
+    $('cSnr').textContent = isFinite(M.snr) ? M.snr.toFixed(0) : '--';
+    $('cQ').textContent = (M.q * 100).toFixed(0) + '%';
+    const mx = Math.max(M.sig, 1e-9);
+    $('lvM').style.width = Math.min(100, M.m / mx * 100) + '%';
+    $('lvS').style.width = Math.min(100, M.s / mx * 100) + '%';
+    $('lvQ').style.width = Math.max(0, Math.min(100, M.snr * 4)) + '%';
+    if (S.scan) renderChans();
+  }
+}
+function drawSpec(px) {
+  const W = spec.width, H = spec.height;
+  sctx.fillStyle = '#0d131b'; sctx.fillRect(0, 0, W, H);
+  const g = sctx.createLinearGradient(0, 0, 0, H); g.addColorStop(0, '#3fb6ff66'); g.addColorStop(1, '#3fb6ff05');
+  sctx.beginPath(); sctx.moveTo(0, H);
+  for (let x = 0; x < W; x += 2) { const v = Math.max(0, Math.min(1, (px[x] - floorDb + 4) / 50)); sctx.lineTo(x, H - 16 * dpr - v * (H - 22 * dpr)); }
+  sctx.lineTo(W, H); sctx.closePath(); sctx.fillStyle = g; sctx.fill();
+  sctx.strokeStyle = '#7fd0ff'; sctx.lineWidth = dpr; sctx.stroke();
+  drawScale(); drawMarkers();
+}
+function drawScale() {
+  const W = spec.width, H = spec.height, [a, b] = range();
+  sctx.fillStyle = '#8b98a9'; sctx.font = `${10 * dpr}px JetBrains Mono, monospace`; sctx.textAlign = 'center';
+  const step = (b - a) > 1500 ? 250 : 100;
+  for (let f = Math.ceil(a / step) * step; f <= b; f += step) {
+    const x = f2x(f, W);
+    sctx.fillRect(x, H - 14 * dpr, dpr, (f % (step * 2) ? 3 : 6) * dpr);
+    if (f % (step * 2) === 0) sctx.fillText(f, x, H - 2 * dpr);
+  }
+}
+function drawMarkers() {
+  const W = spec.width, H = spec.height, c = MET.main ? MET.main.center : +S.center;
+  const ms = RTTY.markSign(S.sideband, S.reverse), fm = c + ms * S.shift / 2, fsp = c - ms * S.shift / 2;
+  const xm = f2x(fm, W), xs = f2x(fsp, W);
+  sctx.fillStyle = '#ffffff10'; sctx.fillRect(Math.min(xm, xs), 0, Math.abs(xs - xm), H - 14 * dpr);
+  sctx.textAlign = 'center';
+  for (const [x, col, lab] of [[xm, '#38e1c6', 'M'], [xs, '#ffb347', 'S']]) {
+    sctx.fillStyle = col; sctx.fillRect(x - dpr, 0, 2 * dpr, H - 14 * dpr);
+    sctx.font = `600 ${10 * dpr}px Inter, sans-serif`; sctx.fillText(lab, x + 7 * dpr, 12 * dpr);
+  }
+  if (S.scan) CH.forEach((ch, i) => {
+    const f = (MET[ch.id] || {}).center || ch.f, x = f2x(f, W);
+    sctx.fillStyle = '#ffd16655'; sctx.fillRect(x - S.shift / 2 / ((range()[1] - range()[0]) / W), 0, S.shift / ((range()[1] - range()[0]) / W), 4 * dpr);
+    sctx.fillStyle = '#ffd166'; sctx.font = `600 ${9 * dpr}px JetBrains Mono, monospace`; sctx.fillText(f.toFixed(0), x, 15 * dpr);
+  });
+  for (const n of NOTCH) {
+    const x = f2x(n, W); sctx.fillStyle = '#ff6b6b'; sctx.fillRect(x - dpr, 0, 2 * dpr, H - 14 * dpr);
+    sctx.font = `700 ${9 * dpr}px JetBrains Mono, monospace`; sctx.fillText('N', x, 24 * dpr);
+  }
+  if (hoverF != null) { const x = f2x(hoverF, W); sctx.fillStyle = '#ffffff55'; sctx.fillRect(x, 0, dpr, H); sctx.fillStyle = '#fff'; sctx.fillText(hoverF.toFixed(0), x, 26 * dpr); }
+}
+function drawScope() {
+  const W = scope.width, r = W / 2;
+  kctx.fillStyle = 'rgba(5,10,8,0.35)'; kctx.fillRect(0, 0, W, W);
+  kctx.strokeStyle = '#123323'; kctx.lineWidth = dpr;
+  kctx.beginPath(); kctx.moveTo(r, 6); kctx.lineTo(r, W - 6); kctx.moveTo(6, r); kctx.lineTo(W - 6, r); kctx.stroke();
+  kctx.beginPath(); kctx.arc(r, r, r * 0.8, 0, 6.283); kctx.stroke();
+  const p = scopeBuf, n = p.length; let k = scopeIdx;
+  kctx.strokeStyle = '#4dffa0'; kctx.lineWidth = 1.3 * dpr; kctx.shadowColor = '#4dffa0'; kctx.shadowBlur = 6 * dpr;
+  kctx.beginPath();
+  for (let i = 0; i < n; i += 2) {
+    const x = r + Math.max(-1.2, Math.min(1.2, p[k] || 0)) * r * 0.75, y = r - Math.max(-1.2, Math.min(1.2, p[k + 1] || 0)) * r * 0.75;
+    i ? kctx.lineTo(x, y) : kctx.moveTo(x, y); k = (k + 2) % n;
+  }
+  kctx.stroke(); kctx.shadowBlur = 0;
+}
+/* click-to-tune with snap to the strongest mark/space pair nearby */
+function tuneAt(clientX, el) {
+  const rect = el.getBoundingClientRect();
+  let f = x2f((clientX - rect.left) * dpr, el.width);
+  if (ctx && running) {
+    let best = f, bs = 0;
+    for (let c = f - 45; c <= f + 45; c += 1) { const s = Math.sqrt(binPow(c - S.shift / 2) * binPow(c + S.shift / 2)); if (s > bs) { bs = s; best = c; } }
+    if (bs > Math.pow(10, floorDb / 10) * 8) f = best;
+  }
+  S.center = Math.round(f * 10) / 10; $('qCenter').value = S.center.toFixed(0); applyModem();
+  if (hostPost) hostPost({ type: 'reset', id: 'main' });
+  const near = CH.find(c => Math.abs(((MET[c.id] || {}).center || c.f) - f) < 60); if (near) removeChan(near.id, false);
+}
+function toggleNotch(clientX, cv) {
+  const r = cv.getBoundingClientRect(), f = Math.round(x2f((clientX - r.left) * dpr, cv.width));
+  const i = NOTCH.findIndex(n => Math.abs(n - f) < 15);
+  if (i >= 0) { toast(t('tNotchOff', NOTCH[i])); NOTCH.splice(i, 1); } else if (NOTCH.length < 4) { NOTCH.push(f); toast(t('tNotchOn', f), 3500); }
+  applyModem();
+}
+for (const el of [spec, $('wfbox')]) {
+  const cv = el === spec ? spec : wf;
+  el.addEventListener('click', e => e.shiftKey ? toggleNotch(e.clientX, cv) : tuneAt(e.clientX, cv));
+  el.addEventListener('contextmenu', e => { e.preventDefault(); toggleNotch(e.clientX, cv); });
+  el.addEventListener('mousemove', e => { const r = cv.getBoundingClientRect(); hoverF = x2f((e.clientX - r.left) * dpr, cv.width); });
+  el.addEventListener('mouseleave', () => hoverF = null);
+}
+
+/* ================= UI wiring ================= */
+function syncUi() {
+  $('qBaud').value = String(S.baud); $('qShift').value = String(S.shift);
+  $('tSb').textContent = S.sideband; $('tSb').classList.add('on');
+  $('tRev').classList.toggle('on', S.reverse); $('tAfc').classList.toggle('on', S.afc);
+  $('tAtc').classList.toggle('on', S.atc); $('tUsos').classList.toggle('on', S.usos);
+  $('qSql').value = S.squelch; $('qCenter').value = (+S.center).toFixed(0);
+  $('cMode').textContent = `${S.baud} / ${S.shift} ${S.sideband}${S.reverse ? ' REV' : ''}`;
+}
+function renderMacros() {
+  const m = $('macros'); m.innerHTML = '';
+  S.macros.forEach(([lab, txt], i) => {
+    const b = document.createElement('button'); b.className = 'btn';
+    b.innerHTML = `<kbd>F${i + 1}</kbd>`; b.appendChild(document.createTextNode(lab));
+    b.title = txt; b.onclick = () => sendMacro(i); m.appendChild(b);
+  });
+  const ed = $('macEdit'); ed.innerHTML = '';
+  S.macros.forEach(([lab, txt], i) => {
+    const r = document.createElement('div'); r.className = 'mac';
+    const a = document.createElement('input'); a.value = lab;
+    const tx = document.createElement('textarea'); tx.value = txt;
+    a.oninput = () => { S.macros[i][0] = a.value; save(); const btn = $('macros').children[i]; btn.lastChild.textContent = a.value; };
+    tx.oninput = () => { S.macros[i][1] = tx.value; save(); $('macros').children[i].title = tx.value; };
+    r.append(a, tx); ed.appendChild(r);
+  });
+}
+function setMacros(set) { S.macros = set.map(x => x.slice()); save(); renderMacros(); toast(t('tMacros')); }
+async function listDevices() {
+  if (!navigator.mediaDevices?.enumerateDevices) return;
+  const devs = await navigator.mediaDevices.enumerateDevices();
+  const fill = (sel, kind, cur) => {
+    sel.innerHTML = '<option value="">Default</option>';
+    devs.filter(d => d.kind === kind).forEach((d, i) => { const o = document.createElement('option'); o.value = d.deviceId; o.textContent = d.label || `${kind} ${i + 1}`; sel.appendChild(o); });
+    sel.value = cur || '';
+  };
+  fill($('sIn'), 'audioinput', S.inId); fill($('sOut'), 'audiooutput', S.outId);
+}
+const isOpen = () => $('modal').classList.contains('open') || $('logModal').classList.contains('open');
+$('bStart').onclick = () => { if (running === 'LIVE') { stopSource(); setRunning(false); } else startMic(); };
+$('bStart2').onclick = startMic;
+$('bDemo').onclick = $('bDemo2').onclick = () => { if (running === 'DEMO') { stopSource(); setRunning(false); } else startDemo(); };
+$('bFile').onclick = () => $('fileIn').click();
+$('fileIn').onchange = e => { if (e.target.files[0]) startFile(e.target.files[0]); e.target.value = ''; };
+$('bSettings').onclick = () => { $('modal').classList.add('open'); listDevices(); $('sNr').value = S.nr; };
+$('bClose').onclick = () => $('modal').classList.remove('open');
+$('modal').onclick = e => { if (e.target.id === 'modal') $('modal').classList.remove('open'); };
+$('qBaud').onchange = e => { S.baud = +e.target.value; applyModem(); };
+$('qShift').onchange = e => { S.shift = +e.target.value; applyModem(); };
+$('qCenter').onchange = e => { S.center = +e.target.value; applyModem(); };
+$('qSql').oninput = e => { S.squelch = +e.target.value; applyModem(); };
+$('tSb').onclick = () => { S.sideband = S.sideband === 'LSB' ? 'USB' : 'LSB'; applyModem(); };
+$('tRev').onclick = () => { S.reverse = !S.reverse; applyModem(); };
+$('tAfc').onclick = () => { S.afc = !S.afc; applyModem(); };
+$('tAtc').onclick = () => { S.atc = !S.atc; applyModem(); };
+$('tUsos').onclick = () => { S.usos = !S.usos; applyModem(); };
+const bind = (id, key, fn) => { const el = $(id); el.value = S[key]; el.addEventListener(el.tagName === 'SELECT' ? 'change' : 'input', () => { S[key] = el.type === 'range' || el.type === 'number' ? +el.value : el.value; save(); fn && fn(); }); };
+bind('sCall', 'call', () => { S.call = S.call.toUpperCase(); restyleCalls(); }); bind('sName', 'name'); bind('sQth', 'qth');
+bind('sLang', 'lang', applyI18n);
+bind('sExch', 'exch', () => S.exch = S.exch.toUpperCase()); bind('sNr', 'nr', () => { S.nr = Math.max(1, S.nr | 0); updateDupe(); });
+bind('sGain', 'gain', () => inGain && (inGain.gain.value = S.gain));
+bind('sTxLvl', 'txLvl'); bind('sMon', 'mon', () => monGain && (monGain.gain.value = +S.mon)); bind('sMute', 'mute');
+bind('sStop', 'stopBits'); bind('sAfcR', 'afcRange', applyModem); bind('sMaxCh', 'maxCh'); bind('sRange', 'range', resize); bind('sSpeed', 'speed');
+bind('sPtt', 'ptt'); bind('sLead', 'lead'); bind('sTot', 'tot');
+bind('sIn', 'inId', () => { if (running === 'LIVE') startMic(); });
+bind('sOut', 'outId', () => { if (ctx && ctx.setSinkId) ctx.setSinkId(S.outId || '').catch(e => toast(t('tOutDev') + e.message)); });
+$('dial').value = S.dial;
+$('bMacRag').onclick = () => setMacros(MACROS_RAG); $('bMacCon').onclick = () => setMacros(MACROS_CON);
+$('bPort').onclick = choosePort;
+$('bSend').onclick = () => { const tx = $('txText').value; $('txText').value = ''; queueTx(tx.endsWith('\n') ? tx : tx + '\n'); };
+$('bStop').onclick = stopTx;
+$('txText').addEventListener('keydown', e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); $('bSend').click(); } });
+$('bClear').onclick = () => { rxEl.innerHTML = ''; word = null; txSpan = null; };
+$('bCopy').onclick = () => navigator.clipboard.writeText(rxEl.textContent).then(() => toast(t('tCopied')), () => toast(t('tCopyBlocked')));
+$('bSave').onclick = () => download('rtty-' + new Date().toISOString().slice(0, 19).replace(/:/g, '') + '.txt', rxEl.textContent, 'text/plain');
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') { stopTx(); $('modal').classList.remove('open'); $('logModal').classList.remove('open'); return; }
+  if (isOpen()) return;                       // never transmit from a shortcut while a dialog is open
+  if (e.key === 'F9') { e.preventDefault(); logQso(); return; }
+  const m = /^F([1-8])$/.exec(e.key); if (m) { e.preventDefault(); sendMacro(+m[1] - 1); }
+});
+
+/* ================= PWA ================= */
+let installEvt = null;
+window.addEventListener('beforeinstallprompt', e => { e.preventDefault(); installEvt = e; $('bInstall').hidden = false; });
+$('bInstall').onclick = async () => { if (!installEvt) return; installEvt.prompt(); await installEvt.userChoice; installEvt = null; $('bInstall').hidden = true; };
+if ('serviceWorker' in navigator && window.isSecureContext && location.protocol !== 'file:') navigator.serviceWorker.register('sw.js').catch(() => {});
+
+syncUi(); renderMacros(); applyI18n(); resize(); requestAnimationFrame(draw);
+window.__rtty = { get rx() { return rxEl.textContent; }, get met() { return MET; }, get ch() { return CH; }, get log() { return LOG; }, get engine() { return engine; }, startDemo, logQso };
+})();
+</script>
+</body>
+</html>
